@@ -17,11 +17,25 @@ Special statements:
 - `loop` loop.
  - Syntax: `loop { ... }`
  - Return value: return value of the last loop.
+- `switch` statement.
+ - TODO
 
-Notes:
+Special statements notes:
+- The `{ ... }` represents a statement and `<condition>` represents a statement with `bool` return type
 - Loops can be broken out of with `brake` or skipped to the next iteration with `continue`
 
-Functions:
-- Can be defined with
+Variables:
+- Always global.
 
+Functions:
+- Can be defined with `fn <name> (<parameters>) { ... }`
+- Parameters may have a type specified: `<name>: <type>`
+- Operators can be defined with `op <name> (<parameters>) { ... }`
+ - Operator name can contain any non-whitespace symbols
+ - Only `1` or `2` parameters are allowed, resulting in `prefix` or `infix` operators, respectively
+
+Other special syntax:
+- 
+
+Operators:
 - `=` - assignment
