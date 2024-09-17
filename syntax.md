@@ -39,3 +39,9 @@ Other special syntax:
 
 Operators:
 - `=` - assignment
+
+Integral Types:
+- int
+- float
+- bool
+- str

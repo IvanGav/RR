@@ -1,3 +1,5 @@
+// for now assume all numbers are ints
+
 #pragma once
 
 #include <string>
