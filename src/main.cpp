@@ -1,18 +1,17 @@
 #include <iostream>
 #include <string>
-#include "tokenizer.cpp"
+#include "tokenizer.h"
+#include "parser.h"
+#include "interpreter.h"
 
 using namespace std;
 
 int main() {
+    Tokenizer t = Tokenizer::new_empty();
     string input;
-    // getline(cin, input);
-    input = "1. This is a test text.\n2. Delimiting () and {}\n3. Delimiting (this)and{this}";
-    tokenizer t = tokenizer::new_empty();
-    t.add_str(input);
-    string out = t.next();
-    do {
-        cout << "'" << out << "'" << endl;
-        out = t.next();
-    } while(out != NO_TOKENS);
+    while(getline(cin, input)) {
+        t.add_str(input);
+    }
+    Interpreter i = Interpreter::new_from_parser(Parser::new_from_tokenizer(t));
+    i.run();
 }
