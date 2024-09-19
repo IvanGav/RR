@@ -11,16 +11,6 @@
 using namespace std;
 
 /*
-    Definitions
-*/
-bool is_delimiter(char c);
-bool is_builtin(string& str);
-bool is_numeric(string& str);
-bool is_fun(string& str);
-struct Token;
-struct Tokenizer;
-
-/*
     Data types
 */
 
@@ -44,6 +34,15 @@ struct Token {
     TokenTypeSpecifier type_spec;
     string data;
 };
+
+/*
+    Definitions
+*/
+bool is_delimiter(char c);
+bool is_int(string& str);
+Token get_token(string& str);
+struct Token;
+struct Tokenizer;
 
 /*
     Constatnts
@@ -106,11 +105,8 @@ struct Tokenizer {
             at_char++;
         }
         //determine the type of token that is the resulting `str` and return
-        if(is_value(str)) {
-            return Token { TokenType::VAL, TokenTypeSpecifier::UNDEF, str }; //change TokenTypeSpecifier::UNDEF to a known type
-        } else {
-            return Token { TokenType::SYMBOL, TokenTypeSpecifier::UNDEF, str };
-        }
+        Token token = get_token(str);
+        return token;
     }
     //add a string to the queue of strings to be tokenized
     void add_str(string str) {
@@ -126,11 +122,18 @@ bool is_delimiter(char c) {
     return c == '\n' || c == '(' || c == ')' || c == '{' || c == '}';
 }
 
-bool is_value(string& str) {
-    if(str == string("true") || str == string("false")) {
-        return true;
-    }
+bool is_int(string& str) {
     string::const_iterator it = str.begin();
-    while (it != str.end() && isdigit(*it)) ++it;
+    if(*it == '-') it++;
+    while (it != str.end() && isdigit(*it)) it++;
     return !str.empty() && it == str.end();
+}
+
+Token get_token(string& str) {
+    if(str == string("true") || str == string("false")) {
+        return Token { TokenType::VAL, TokenTypeSpecifier::T_BOOL, str };
+    } else if(is_int(str)) {
+        return Token { TokenType::VAL, TokenTypeSpecifier::T_INT, str };
+    }
+    return Token { TokenType::SYMBOL, TokenTypeSpecifier::UNDEF, str };
 }

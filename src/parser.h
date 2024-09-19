@@ -14,8 +14,8 @@ using namespace std;
 
 struct TokenNode {
     Token token;
-    int chnum;
-    TokenNode* next;
+    int child_num;
+    TokenNode* children;
 };
 
 /*
@@ -40,18 +40,18 @@ struct Parser {
             switch(token.type) {
                 case TokenType::NONE: return root;
                 case TokenType::VAL: {
-                    cout << "-- parse value" << endl;
+                    // cout << "-- parse value" << endl;
                     //replace root with a number
                     root = new TokenNode { token, 0, nullptr };
                 }; break;
-                case TokenType::FUN: {
-                    cout << "-- parse function" << endl;
+                case TokenType::SYMBOL: {
+                    // cout << "-- parse function" << endl;
                     //put in an operator and read the next operand
                     Token rop = t.next();
                     TokenNode* lop_node = root;
                     root = new TokenNode { token, 2, new TokenNode[2] };
-                    root->next[0] = *lop_node;
-                    root->next[1] = TokenNode { rop, 0, nullptr };
+                    root->children[0] = *lop_node;
+                    root->children[1] = TokenNode { rop, 0, nullptr };
                 }; break;
                 default: break;
             }
@@ -66,11 +66,11 @@ struct Parser {
 */
 
 void delete_tree_recur(TokenNode* root) {
-    for(int i = 0; i < root->chnum; i++) {
-        delete_tree_recur(&root->next[i]);
+    for(int i = 0; i < root->child_num; i++) {
+        delete_tree_recur(&root->children[i]);
     }
-    if(root->next != nullptr) {
-        delete[] root->next;
+    if(root->children != nullptr) {
+        delete[] root->children;
     }
 }
 

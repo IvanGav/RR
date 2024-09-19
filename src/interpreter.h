@@ -37,19 +37,19 @@ struct Interpreter {
     private:
     int recur_run(TokenNode* root) {
         if(root->token.type == TokenType::VAL) {
-            cout << "-- saw value " << root->token.data << endl;
+            // cout << "-- saw value " << root->token.data << endl;
             return to_num(root->token.data);
-        } else if(root->token.type == TokenType::FUN) {
+        } else if(root->token.type == TokenType::SYMBOL) {
             string fun = root->token.data;
-            cout << "-- saw function " << fun << endl;
+            // cout << "-- saw function " << fun << endl;
             if(fun == "+") {
-                return recur_run(&root->next[0]) + recur_run(&root->next[1]);
+                return recur_run(&root->children[0]) + recur_run(&root->children[1]);
             } else if(fun == "-") {
-                return recur_run(&root->next[0]) - recur_run(&root->next[1]);
+                return recur_run(&root->children[0]) - recur_run(&root->children[1]);
             } else if(fun == "*") {
-                return recur_run(&root->next[0]) * recur_run(&root->next[1]);
+                return recur_run(&root->children[0]) * recur_run(&root->children[1]);
             } else if(fun == "/") {
-                return recur_run(&root->next[0]) / recur_run(&root->next[1]);
+                return recur_run(&root->children[0]) / recur_run(&root->children[1]);
             } else {
                 return -1;
             }
