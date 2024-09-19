@@ -3,6 +3,7 @@
 #include "tokenizer.h"
 #include "parser.h"
 #include "interpreter.h"
+#include "environment.h"
 
 using namespace std;
 

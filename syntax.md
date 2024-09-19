@@ -31,14 +31,18 @@ Functions:
 - Can be defined with `fn <name> (<parameters>) { ... }`
 - Parameters may have a type specified: `<name>: <type>`
 - Operators can be defined with `op <name> (<parameters>) { ... }`
- - Operator name can contain any non-whitespace symbols
+ - Operator name can contain any non-whitespace and non-delimiter (`.,()[]{}<>"`) symbols
  - Only `1` or `2` parameters are allowed, resulting in `prefix` or `infix` operators, respectively
+ - To define an operator and a function with the same implementation, use `fn <fn_name> as op <op_name> (<parameters>) { ... }`
 
 Other special syntax:
-- 
-
-Operators:
 - `=` - assignment
+
+Built in Functions/Operators:
+- Functions:
+ - `add`
+- Operators:
+ - `+`
 
 Integral Types:
 - int
