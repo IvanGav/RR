@@ -40,12 +40,10 @@ struct Parser {
             switch(token.type) {
                 case TokenType::NONE: return root;
                 case TokenType::VAL: {
-                    // cout << "-- parse value" << endl;
                     //replace root with a number
                     root = new TokenNode { token, 0, nullptr };
                 }; break;
                 case TokenType::SYMBOL: {
-                    // cout << "-- parse function" << endl;
                     //put in an operator and read the next operand
                     Token rop = t.next();
                     TokenNode* lop_node = root;
@@ -53,11 +51,23 @@ struct Parser {
                     root->children[0] = *lop_node;
                     root->children[1] = TokenNode { rop, 0, nullptr };
                 }; break;
+                case TokenType::DELIM: {
+                    //do something
+                }; break;
                 default: break;
             }
             token = t.next();
         }
         return root;
+    }
+    TokenNode* parse_symbol(TokenNode* root, Token symbol) {
+        //assume expression
+        if(root->token.type == TokenType::VAL || root->token.type_spec == TokenTypeSpecifier::VAR) {
+            //try as operator
+        }
+        //look for next token
+        // if `(`, try as function
+        // else try as variable
     }
 };
 

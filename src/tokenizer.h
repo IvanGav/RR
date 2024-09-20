@@ -17,7 +17,7 @@ using namespace std;
 enum TokenType {
     VAL /* represents a literal of any integral type */,
     SYMBOL,
-    DELIM, /* specifier doesn't matter */
+    DELIM, /* TokenTypeSpecifier doesn't matter */
     NONE
 };
 
@@ -71,6 +71,10 @@ struct Tokenizer {
         return Tokenizer { vec, 0, 0 };
     }
 
+    //add a string to the queue of strings to be tokenized
+    void add_str(string str) {
+        raw.push_back(str);
+    }
     //for now, split around whitespace and treat newlines as a token
     //return empty string when nothing else to read
     Token next() {
@@ -89,12 +93,13 @@ struct Tokenizer {
             at_line++;
             at_char = 0;
             return NEWLINE_TOKEN;
-            // return this->next();
         }
         //check for a delimiter
+        //return a string literal when encountered
         if(is_delimiter(raw[at_line][at_char])) {
             char c = raw[at_line][at_char];
             at_char++;
+            if(c == '"') return Token { TokenType::VAL, TokenTypeSpecifier::T_STR, read_until(c) };
             return Token { TokenType::DELIM, TokenTypeSpecifier::UNDEF, string() + c };
         }
         //read into `str`
@@ -108,9 +113,27 @@ struct Tokenizer {
         Token token = get_token(str);
         return token;
     }
-    //add a string to the queue of strings to be tokenized
-    void add_str(string str) {
-        raw.push_back(str);
+    //read until a specified character; ignore the character, when encountered
+    string read_until(char delim) {
+        string str;
+        //read into `str`
+        while(true) {
+            char c = raw[at_line][at_char];
+            if(c == delim) {
+                at_char++;
+                break;
+            }
+            str += c;
+            at_char++;
+            if(at_char == raw[at_line].size()) {
+                at_line++;
+                at_char = 0;
+            }
+            if(at_line == raw.size()) {
+                break;
+            }
+        }
+        return str;
     }
 };
 
@@ -119,7 +142,7 @@ struct Tokenizer {
 */
 
 bool is_delimiter(char c) {
-    return c == '\n' || c == '(' || c == ')' || c == '{' || c == '}';
+    return c == '\n' || c == '(' || c == ')' || c == '{' || c == '}' || c == '.' || c == ',' || c == ':' || c == ';' || c == '"' || c == '\'';
 }
 
 bool is_int(string& str) {
