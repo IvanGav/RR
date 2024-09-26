@@ -1,6 +1,6 @@
 # R++ Syntax
 
-A dynamically typed language. Every symbol can consist of `a-z`, `A-Z`, `0-9`, `_` and `-`. Symbols don't need to be declared (like Py or R).
+A dynamically typed language. Every symbol can consist of `a-z`, `A-Z`, `0-9`, `_`. Symbols don't need to be declared (like Py or R).
 
 Every line is a statement. Every code block is a single statement. Every statement has a return value. Return value of a code block is the return value of the last line. `return <var/val>` can be used to instantly return from a code block with a specified return value.
 
