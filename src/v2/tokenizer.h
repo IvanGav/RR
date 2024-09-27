@@ -1,4 +1,3 @@
-// Given a string that is the source code, return a list of tokenss
 // For format, refer to ../syntax.md
 
 #pragma once
@@ -61,7 +60,6 @@ struct CharClassifier {
         for(char c = '0'; c <= '9'; c++)
             cc.chars[c] = CharType::NUMBER;
         //add delimiters
-        cc.chars[':'] = CharType::DELIM;
         cc.chars['('] = CharType::DELIM;
         cc.chars[')'] = CharType::DELIM;
         cc.chars['['] = CharType::DELIM;
@@ -94,6 +92,7 @@ struct CharClassifier {
         cc.chars['#'] = CharType::SPECIAL;
         cc.chars['!'] = CharType::SPECIAL;
         cc.chars['`'] = CharType::SPECIAL;
+        cc.chars[':'] = CharType::SPECIAL;
     }
 
     CharType type_of(char c) {
