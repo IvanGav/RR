@@ -6,6 +6,7 @@
 #include <unordered_map>
 
 #include "datatypes.h"
+#include "rr_obj.h"
 
 using namespace std;
 
@@ -30,43 +31,29 @@ operators `Vec`, `Set`, `List` can be used to convert between the types
     Definitions
 */
 
+//lower number means higher priority [0,16)
+//0 - highest priority
+//15 - lowest priority
+unordered_map<string, int> op_order;
+const int OP_HIGH_PRI = 0;
+const int OP_LOW_PRI = 15;
+
 /*
     Functions
 */
+
+void init_op_order() {
+    op_order["="] = OP_LOW_PRI; //both sides get evaluated first
+    op_order["+"] = OP_HIGH_PRI+5;
+    op_order["*"] = OP_HIGH_PRI+4;
+}
 
 /*
     Structs
 */
 
-struct RRDataType {
-    int type;
-
-    static RRDataType from_str(string str) {
-        return RRDataType { {single_type_of(str)} };
-    }
-
-    bool operator==(RRDataType const& rhs) {
-        return this->type == rhs.type;
-    }
-    //return true if this object is *equivalent* to rhs
-    //rhs may include datatype `Any`
-    bool equivalent_to(RRDataType const& rhs) {
-        return (*this == rhs) || rhs.type == DATATYPE_ANY;
-    }
-};
-
-//takes ownership of the data
-struct RRObj {
-    vector<int> type;
-    void* data;
-};
-
-struct RRFun {
-    vector<int> params;
-    void* cpp_fun;
-    void* rr_fun;
-};
-
 struct Env {
-
+    RRObj get_var(string name) {
+        return RRObj { RRDataType::from_str("Any"), nullptr };
+    }
 };
