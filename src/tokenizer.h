@@ -16,9 +16,9 @@ using namespace std;
 
 enum TokenType {
     VAL /* represents a literal of any integral type */,
-    SYMBOL,
-    DELIM, /* TokenTypeSpecifier doesn't matter */
-    NONE
+    T_SYMBOL,
+    T_DELIM, /* TokenTypeSpecifier doesn't matter */
+    T_NONE
 };
 
 enum TokenTypeSpecifier {
@@ -47,8 +47,8 @@ struct Tokenizer;
 /*
     Constatnts
 */
-const Token NO_TOKENS = Token { TokenType::NONE, TokenTypeSpecifier::UNDEF, "" };
-const Token NEWLINE_TOKEN = Token { TokenType::DELIM, TokenTypeSpecifier::UNDEF, "\n" };
+const Token NO_TOKENS = Token { TokenType::T_NONE, TokenTypeSpecifier::UNDEF, "" };
+const Token NEWLINE_TOKEN = Token { TokenType::T_DELIM, TokenTypeSpecifier::UNDEF, "\n" };
 
 /*
     Tokenizer struct
@@ -100,7 +100,7 @@ struct Tokenizer {
             char c = raw[at_line][at_char];
             at_char++;
             if(c == '"') return Token { TokenType::VAL, TokenTypeSpecifier::T_STR, read_until(c) };
-            return Token { TokenType::DELIM, TokenTypeSpecifier::UNDEF, string() + c };
+            return Token { TokenType::T_DELIM, TokenTypeSpecifier::UNDEF, string() + c };
         }
         //read into `str`
         for(int i = at_char; i < size; i++) {
@@ -158,5 +158,5 @@ Token get_token(string& str) {
     } else if(is_int(str)) {
         return Token { TokenType::VAL, TokenTypeSpecifier::T_INT, str };
     }
-    return Token { TokenType::SYMBOL, TokenTypeSpecifier::UNDEF, str };
+    return Token { TokenType::T_SYMBOL, TokenTypeSpecifier::UNDEF, str };
 }

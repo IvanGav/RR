@@ -36,14 +36,14 @@ struct Parser {
     TokenNode* next() {
         TokenNode* root = nullptr;
         Token token = t.next();
-        while(token.type != TokenType::DELIM) {
+        while(token.type != TokenType::T_DELIM) {
             switch(token.type) {
-                case TokenType::NONE: return root;
+                case TokenType::T_NONE: return root;
                 case TokenType::VAL: {
                     //replace root with a number
                     root = new TokenNode { token, 0, nullptr };
                 }; break;
-                case TokenType::SYMBOL: {
+                case TokenType::T_SYMBOL: {
                     //put in an operator and read the next operand
                     Token rop = t.next();
                     TokenNode* lop_node = root;
@@ -51,7 +51,7 @@ struct Parser {
                     root->children[0] = *lop_node;
                     root->children[1] = TokenNode { rop, 0, nullptr };
                 }; break;
-                case TokenType::DELIM: {
+                case TokenType::T_DELIM: {
                     //do something
                 }; break;
                 default: break;

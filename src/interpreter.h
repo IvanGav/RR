@@ -39,7 +39,7 @@ struct Interpreter {
         if(root->token.type == TokenType::VAL) {
             // cout << "-- saw value " << root->token.data << endl;
             return to_num(root->token.data);
-        } else if(root->token.type == TokenType::SYMBOL) {
+        } else if(root->token.type == TokenType::T_SYMBOL) {
             string fun = root->token.data;
             // cout << "-- saw function " << fun << endl;
             if(fun == "+") {

@@ -7,6 +7,7 @@
 
 #include "datatypes.h"
 #include "rr_obj.h"
+#include "cpp_fun_impl.h"
 
 using namespace std;
 
@@ -53,7 +54,36 @@ void init_op_order() {
 */
 
 struct Env {
+    unordered_map<string, RRObj> vars;
+    unordered_map<string, vector<RRFun>> funs;
+
+    Env() {
+        vars = {};
+        funs = {};
+        funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_add_int));
+        funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
+    }
+
     RRObj get_var(string name) {
-        return RRObj(RRDataType::from_str("Any"));
+        if(vars.find(name) == vars.end()) {
+            return vars[name]; //DEAL WITH THIS CASE SOMEHOW
+        }
+        return vars[name];
+    }
+    RRFun get_fun(string name, vector<RRDataType> arg_types) {
+        if(funs.find(name) == funs.end()) {
+            return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
+        }
+        for(RRFun f : funs[name]) {
+            //check if `f.params` vector is equal to `arg_types` vector
+            if(f.params == arg_types) {
+                return f;
+            }
+        }
+        return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
+    }
+    RRObj assign_var(string name, RRObj obj) {
+        vars[name] = obj;
+        return obj;
     }
 };

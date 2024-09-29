@@ -13,11 +13,11 @@ using namespace std;
 */
 
 enum TokenType {
-    NEWLINE,
-    DELIM,
-    LITERAL, //L_
-    SYMBOL, //S_
-    NONE
+    T_NEWLINE,
+    T_DELIM,
+    T_LITERAL, //L_
+    T_SYMBOL, //S_
+    T_NONE
 };
 
 enum TokenInfo {
@@ -26,13 +26,13 @@ enum TokenInfo {
 };
 
 enum CharType {
-    LETTER,
-    NUMBER,
+    C_LETTER,
+    C_NUMBER,
     C_DELIM,
-    WHITESPACE,
+    C_WHITESPACE,
     C_NEWLINE,
-    STR, //quotation marks `"`
-    SPECIAL, //anything else: `+=-*/<>~!@#$%^&|` etc
+    C_STR, //quotation marks `"`
+    C_SPECIAL, //anything else: `+=-*/<>~!@#$%^&|` etc
 };
 
 /*
@@ -52,13 +52,13 @@ struct CharClassifier {
         CharClassifier cc;
         //add letters
         for(char c = 'a'; c <= 'z'; c++)
-            cc.chars[c] = CharType::LETTER;
+            cc.chars[c] = CharType::C_LETTER;
         for(char c = 'A'; c <= 'Z'; c++)
-            cc.chars[c] = CharType::LETTER;
-        cc.chars['_'] = CharType::LETTER; //yes, underscore **is** a letter
+            cc.chars[c] = CharType::C_LETTER;
+        cc.chars['_'] = CharType::C_LETTER; //yes, underscore **is** a letter
         //add numbers
         for(char c = '0'; c <= '9'; c++)
-            cc.chars[c] = CharType::NUMBER;
+            cc.chars[c] = CharType::C_NUMBER;
         //add delimiters
         cc.chars['('] = CharType::C_DELIM;
         cc.chars[')'] = CharType::C_DELIM;
@@ -69,30 +69,30 @@ struct CharClassifier {
         cc.chars['.'] = CharType::C_DELIM;
         cc.chars[','] = CharType::C_DELIM;
         //add whitespaces
-        cc.chars[' '] = CharType::WHITESPACE;
-        cc.chars['\t'] = CharType::WHITESPACE;
-        cc.chars['\r'] = CharType::WHITESPACE;
+        cc.chars[' '] = CharType::C_WHITESPACE;
+        cc.chars['\t'] = CharType::C_WHITESPACE;
+        cc.chars['\r'] = CharType::C_WHITESPACE;
         //add newlines
         cc.chars[';'] = CharType::C_NEWLINE;
         cc.chars['\n'] = CharType::C_NEWLINE;
         //add string marker
-        cc.chars['"'] = CharType::STR;
-        cc.chars['\''] = CharType::STR;
+        cc.chars['"'] = CharType::C_STR;
+        cc.chars['\''] = CharType::C_STR;
         //add symbols
-        cc.chars['*'] = CharType::SPECIAL;
-        cc.chars['+'] = CharType::SPECIAL;
-        cc.chars['='] = CharType::SPECIAL;
-        cc.chars['-'] = CharType::SPECIAL;
-        cc.chars['/'] = CharType::SPECIAL;
-        cc.chars['|'] = CharType::SPECIAL;
-        cc.chars['\\'] = CharType::SPECIAL;
-        cc.chars['&'] = CharType::SPECIAL;
-        cc.chars['^'] = CharType::SPECIAL;
-        cc.chars['%'] = CharType::SPECIAL;
-        cc.chars['#'] = CharType::SPECIAL;
-        cc.chars['!'] = CharType::SPECIAL;
-        cc.chars['`'] = CharType::SPECIAL;
-        cc.chars[':'] = CharType::SPECIAL;
+        cc.chars['*'] = CharType::C_SPECIAL;
+        cc.chars['+'] = CharType::C_SPECIAL;
+        cc.chars['='] = CharType::C_SPECIAL;
+        cc.chars['-'] = CharType::C_SPECIAL;
+        cc.chars['/'] = CharType::C_SPECIAL;
+        cc.chars['|'] = CharType::C_SPECIAL;
+        cc.chars['\\'] = CharType::C_SPECIAL;
+        cc.chars['&'] = CharType::C_SPECIAL;
+        cc.chars['^'] = CharType::C_SPECIAL;
+        cc.chars['%'] = CharType::C_SPECIAL;
+        cc.chars['#'] = CharType::C_SPECIAL;
+        cc.chars['!'] = CharType::C_SPECIAL;
+        cc.chars['`'] = CharType::C_SPECIAL;
+        cc.chars[':'] = CharType::C_SPECIAL;
     }
 
     CharType type_of(char c) {
@@ -121,69 +121,69 @@ struct Tokenizer {
     //return the next token
     Token next() {
         //check for eof
-        if(done()) return Token { "", TokenType::NONE };
+        if(done()) return Token { "", TokenType::T_NONE };
         //skip whitespace
-        while(cc.type_of(source[at_char]) == CharType::WHITESPACE) at_char++;
+        while(cc.type_of(source[at_char]) == CharType::C_WHITESPACE) at_char++;
         //identify the first character to look at
         CharType ctype = cc.type_of(source[at_char]);
         //if found a newline, get it
         if(ctype == CharType::C_NEWLINE) {
             at_char++;
-            return Token { "\n", TokenType::NEWLINE };  //it's ok to treat `;` as `\n`
+            return Token { "\n", TokenType::T_NEWLINE };  //it's ok to treat `;` as `\n`
         }
         //if found a delimiter, get it
         if(ctype == CharType::C_DELIM) {
             at_char++;
-            return Token { string() + prev_char(), TokenType::DELIM }; //delimiters are **always** 1 character long
+            return Token { string() + prev_char(), TokenType::T_DELIM }; //delimiters are **always** 1 character long
         }
         string token_str;
         //if found string or number, read a literal
-        if(ctype == CharType::STR) {
+        if(ctype == CharType::C_STR) {
             at_char++;
             while(source[at_char] != '"') {
                 token_str += source[at_char];
                 at_char++;
             }
             at_char++;
-            return Token { token_str, TokenType::LITERAL, TokenInfo::L_STR };
+            return Token { token_str, TokenType::T_LITERAL, TokenInfo::L_STR };
         }
-        if(ctype == CharType::NUMBER) {
+        if(ctype == CharType::C_NUMBER) {
             bool is_float = false;
             do {
                 if(source[at_char] == '.') is_float = true;
                 token_str += source[at_char];
                 at_char++;
                 ctype = cc.type_of(source[at_char]);
-            } while(ctype == CharType::NUMBER || (source[at_char] == '.' && !is_float));
+            } while(ctype == CharType::C_NUMBER || (source[at_char] == '.' && !is_float));
             at_char++;
-            return Token { token_str, TokenType::LITERAL, is_float ? TokenInfo::L_FLOAT : TokenInfo::L_INT };
+            return Token { token_str, TokenType::T_LITERAL, is_float ? TokenInfo::L_FLOAT : TokenInfo::L_INT };
         }
         //if found a letter, read a symbol until non-letter/number
-        if(ctype == CharType::LETTER) {
+        if(ctype == CharType::C_LETTER) {
             do {
                 token_str += source[at_char];
                 at_char++;
                 ctype = cc.type_of(source[at_char]);
-            } while(ctype == CharType::LETTER || ctype == CharType::NUMBER);
+            } while(ctype == CharType::C_LETTER || ctype == CharType::C_NUMBER);
             at_char++;
-            return Token { token_str, TokenType::SYMBOL, TokenInfo::S_LETTER };
+            return Token { token_str, TokenType::T_SYMBOL, TokenInfo::S_LETTER };
         }
         //read a symbol until non-special
-        if(ctype == CharType::SPECIAL) {
+        if(ctype == CharType::C_SPECIAL) {
             do {
                 token_str += source[at_char];
                 at_char++;
                 ctype = cc.type_of(source[at_char]);
-            } while(ctype == CharType::SPECIAL);
+            } while(ctype == CharType::C_SPECIAL);
             at_char++;
-            return Token { token_str, TokenType::SYMBOL, TokenInfo::S_SPECIAL };
+            return Token { token_str, TokenType::T_SYMBOL, TokenInfo::S_SPECIAL };
         }
     }
 
     //return all of the remaining tokens in a vector
     vector<Token> tokenize() {
         vector<Token> ts;
-        while((*(ts.end()-1)).type != TokenType::NONE) {
+        while((*(ts.end()-1)).type != TokenType::T_NONE) {
             ts.push_back(next());
         }
         return ts;
