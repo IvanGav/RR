@@ -54,6 +54,6 @@ void init_op_order() {
 
 struct Env {
     RRObj get_var(string name) {
-        return RRObj { RRDataType::from_str("Any"), nullptr };
+        return RRObj(RRDataType::from_str("Any"));
     }
 };

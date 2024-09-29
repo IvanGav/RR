@@ -43,7 +43,8 @@
         "streambuf": "cpp",
         "typeinfo": "cpp",
         "iostream": "cpp",
-        "istream": "cpp"
+        "istream": "cpp",
+        "unordered_set": "cpp"
     },
     "C_Cpp.default.compilerPath": "/bin/gcc"
 }

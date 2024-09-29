@@ -28,9 +28,9 @@ enum TokenInfo {
 enum CharType {
     LETTER,
     NUMBER,
-    DELIM,
+    C_DELIM,
     WHITESPACE,
-    NEWLINE,
+    C_NEWLINE,
     STR, //quotation marks `"`
     SPECIAL, //anything else: `+=-*/<>~!@#$%^&|` etc
 };
@@ -60,21 +60,21 @@ struct CharClassifier {
         for(char c = '0'; c <= '9'; c++)
             cc.chars[c] = CharType::NUMBER;
         //add delimiters
-        cc.chars['('] = CharType::DELIM;
-        cc.chars[')'] = CharType::DELIM;
-        cc.chars['['] = CharType::DELIM;
-        cc.chars[']'] = CharType::DELIM;
-        cc.chars['{'] = CharType::DELIM;
-        cc.chars['}'] = CharType::DELIM;
-        cc.chars['.'] = CharType::DELIM;
-        cc.chars[','] = CharType::DELIM;
+        cc.chars['('] = CharType::C_DELIM;
+        cc.chars[')'] = CharType::C_DELIM;
+        cc.chars['['] = CharType::C_DELIM;
+        cc.chars[']'] = CharType::C_DELIM;
+        cc.chars['{'] = CharType::C_DELIM;
+        cc.chars['}'] = CharType::C_DELIM;
+        cc.chars['.'] = CharType::C_DELIM;
+        cc.chars[','] = CharType::C_DELIM;
         //add whitespaces
         cc.chars[' '] = CharType::WHITESPACE;
         cc.chars['\t'] = CharType::WHITESPACE;
         cc.chars['\r'] = CharType::WHITESPACE;
         //add newlines
-        cc.chars[';'] = CharType::NEWLINE;
-        cc.chars['\n'] = CharType::NEWLINE;
+        cc.chars[';'] = CharType::C_NEWLINE;
+        cc.chars['\n'] = CharType::C_NEWLINE;
         //add string marker
         cc.chars['"'] = CharType::STR;
         cc.chars['\''] = CharType::STR;
@@ -127,12 +127,12 @@ struct Tokenizer {
         //identify the first character to look at
         CharType ctype = cc.type_of(source[at_char]);
         //if found a newline, get it
-        if(ctype == CharType::NEWLINE) {
+        if(ctype == CharType::C_NEWLINE) {
             at_char++;
             return Token { "\n", TokenType::NEWLINE };  //it's ok to treat `;` as `\n`
         }
         //if found a delimiter, get it
-        if(ctype == CharType::DELIM) {
+        if(ctype == CharType::C_DELIM) {
             at_char++;
             return Token { string() + prev_char(), TokenType::DELIM }; //delimiters are **always** 1 character long
         }

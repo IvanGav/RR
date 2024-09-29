@@ -10,6 +10,7 @@
 #include "rr_obj.h"
 #include "tokenizer.h"
 #include "environment.h"
+#include "rr_error.h"
 
 using namespace std;
 
@@ -21,7 +22,7 @@ enum ASTType {
     STATEMENT, //a singular statement, consisting of one or more nodes
     IF,
     LOOP,
-    LITERAL,
+    AST_LITERAL,
     VAR,
     FUN,
     FUN_DECL,
@@ -33,22 +34,32 @@ enum ASTType {
 */
 struct ASTNode {
     ASTType type;
-    vector<ASTNode> children;
+    vector<ASTNode*> children;
     void* data;
+
+    ASTNode(ASTType type, vector<ASTNode*> children, void* data) {
+        this->type = type;
+        this->children = children;
+        this->data = data;
+    }
+
+    // static ASTNode from(ASTType type, vector<ASTNode*> children, void* data) {
+    //     return ASTNode { type, children, data };
+    // }
 
     RRObj eval(Env& env) {
         switch (type) {
             case ASTType::STATEMENT: {
                 for(int i = 0; i < children.size()-1; i++) {
-                    children[i].eval(env);
+                    children[i]->eval(env);
                 }
-                return children[children.size()-1].eval(env);
+                return children[children.size()-1]->eval(env);
             }; break;
             case ASTType::IF: {
             }; break;
             case ASTType::LOOP: {
             }; break;
-            case ASTType::LITERAL: {
+            case ASTType::AST_LITERAL: {
                 return *((RRObj*) data);
             }; break;
             case ASTType::VAR: {
@@ -62,8 +73,7 @@ struct ASTNode {
             }; break;
             default: break;
         }
-        cout << "--RR: Invalid statement encountered: " << type << endl;
-        exit(1);
+        parse_error(string("Invalid statement encountered: ")+to_string(type));
     }
 };
 
@@ -98,6 +108,10 @@ struct Parser {
                 case TokenType::DELIM: {
                 }; break;
                 case TokenType::LITERAL: {
+                    if(root != nullptr) {
+                        parse_error(string("Invalid literal usage"));
+                    }
+                    root = new ASTNode(ASTType::AST_LITERAL, {}, new RRObj(tokens[at_elem]) );
                 }; break;
                 case TokenType::SYMBOL: {
                 }; break;
@@ -109,6 +123,12 @@ struct Parser {
         }
         //should never be reached
         return root;
+    }
+
+    //parse until `)` is reached; return the resulting AST
+    //expect **not** to see `(` as current element
+    ASTNode* parse_parentheses_statement() {
+
     }
 
     //parse until `}` is reached; return the resulting AST
@@ -128,15 +148,15 @@ struct Parser {
                         return root;
                     }
                     ASTNode* line = parse_line();
-                    root->children.push_back(*line);
+                    root->children.push_back(line);
                 }; break;
                 case TokenType::LITERAL: {
                     ASTNode* line = parse_line();
-                    root->children.push_back(*line);
+                    root->children.push_back(line);
                 }; break;
                 case TokenType::SYMBOL: {
                     ASTNode* line = parse_line();
-                    root->children.push_back(*line);
+                    root->children.push_back(line);
                 }; break;
                 case TokenType::NONE: {
                     done = true;
