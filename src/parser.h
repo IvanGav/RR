@@ -5,6 +5,7 @@
 
 #include <string>
 #include <vector>
+#include <variant>
 
 #include "datatypes.h"
 #include "rr_obj.h"
@@ -20,11 +21,11 @@ using namespace std;
 
 enum ASTType {
     STATEMENT, //a singular statement, consisting of one or more nodes
-    IF,
-    LOOP,
     LITERAL,
     VAR,
     FUN, //== operator
+    IF,
+    LOOP,
     FUN_DECL,
     RETURN,
     CSV, //comma separated values
@@ -57,7 +58,40 @@ struct ASTNode {
     ASTNode(ASTType type, vector<ASTNode*> children, string symbol_name) {
         this->type = type;
         this->children = children;
-        this->symbol = symbol_name;
+        // this->symbol;
+        // this->symbol = string(symbol_name);
+        new (&this->symbol) string(symbol_name);
+    }
+    ~ASTNode() {
+        // cout << "--destructor for ASTNode is called" << endl;
+        switch(type) {
+            case ASTType::LITERAL: literal.~RRObj(); break;
+            case ASTType::FUN: symbol.~string(); break;
+            case ASTType::VAR: symbol.~string(); break;
+            default: break; //STATEMENT
+        }
+    }
+    ASTNode& operator=(const ASTNode& val) {
+        // cout << "--operator= for ASTNode is called" << endl;
+        // Nothing to do in case of self-assignment
+        if (&val != this) {
+            switch(type) {
+                case ASTType::LITERAL: literal.~RRObj(); break;
+                case ASTType::FUN: symbol.~string(); break;
+                case ASTType::VAR: symbol.~string(); break;
+                default: break; //STATEMENT
+            }
+            type = val.type;
+            children = val.children;
+            switch(val.type) {
+                case ASTType::LITERAL: literal = val.literal; break;
+                case ASTType::FUN: symbol = val.symbol; break;
+                case ASTType::VAR: symbol = val.symbol; break;
+                default: break; //STATEMENT
+            }
+        }
+
+        return *this;
     }
 
     RRObj eval(Env& env) {
@@ -150,11 +184,13 @@ struct Parser {
         while(!done) {
             switch(tokens[at_elem].type) {
                 case TokenType::T_NEWLINE: {
+                    // cout << "----encountered a newline" << endl;
                     //when reading a line, newline is the definitive end of statement
                     at_elem++;
                     return root;
                 }; break;
                 case TokenType::T_DELIM: {
+                    // cout << "----parsing a delim" << endl;
                     if(tokens[at_elem].t == "}") {
                         //block statement ends without a newline
                         return root;
@@ -247,6 +283,7 @@ struct Parser {
 //Insert `to_insert` into `root`
 //REVISIT LATER
 ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert) {
+    // cout << "----inserting into AST " << *to_insert << endl;
     if(root == nullptr) return to_insert;
     switch (to_insert->type) {
         case ASTType::LITERAL: {

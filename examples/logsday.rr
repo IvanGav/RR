@@ -1,0 +1,3 @@
+msg = "I SEE NO LOGS" + " " + "IT'S 20 MIN UNTIL MIDNIGHT"
+
+msg repeat 200
