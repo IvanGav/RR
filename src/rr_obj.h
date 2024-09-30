@@ -29,12 +29,12 @@ struct RRDataType {
         }
     }
 
-    bool operator==(RRDataType const& rhs) {
-        return this->type == rhs.type;
+    friend bool operator==(const RRDataType& lhs, const RRDataType& rhs) {
+        return lhs.type == rhs.type;
     }
     //return true if this object is *equivalent* to rhs
     //rhs may include datatype `Any`
-    bool equivalent_to(RRDataType const& rhs) {
+    bool equivalent_to(RRDataType& rhs) {
         return (*this == rhs) || rhs.type == DATATYPE_ANY;
     }
 };
@@ -53,6 +53,11 @@ struct RRObj {
         pair<RRObj, RRObj>* data_pair;
     };
 
+    RRObj() {
+        type = RRDataType();
+        data_int = 0;
+    }
+
     RRObj(RRDataType t) {
         type = t;
         data_int = 0;
@@ -66,6 +71,16 @@ struct RRObj {
             case TokenInfo::L_INT: this->data_int = (stol(t.t)); break;
             case TokenInfo::L_FLOAT: this->data_float = (stod(t.t)); break;
             default: break;
+        }
+    }
+    
+    friend std::ostream& operator<<(std::ostream& os, const RRObj& obj) {
+        switch(obj.type.type) {
+            case 0: return os << "Bool: " << obj.data_bool;
+            case 1: return os << "Int: " << obj.data_int;
+            case 2: return os << "Float: " << obj.data_float;
+            case 3: return os << "Str: " << *(obj.data_str);
+            default: return os;
         }
     }
 };

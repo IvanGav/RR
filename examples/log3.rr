@@ -1,0 +1,4 @@
+log = "Logsday!"
+log_num = 3
+
+log + " log #" + log_num + " " repeat 4

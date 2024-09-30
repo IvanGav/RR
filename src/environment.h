@@ -5,88 +5,91 @@
 #include <iostream>
 #include <unordered_map>
 
-#include "parser.h"
+#include "datatypes.h"
+#include "rr_obj.h"
+#include "cpp_fun_impl.h"
 
 using namespace std;
+
+//types stored in place:
+// Int, Float, Bool
+//types stored behind pointers:
+// Str, FnPtr, Vec, Set, Map, List, Pair
+
+/*
+"" = str
+[] = vec = can store several elements of the *exact same type*
+|| = list = can store several elements of *different types*
+v:w = pair of (v,w)
+
+Any = not a type that can be assigned to a variable, but can be used for "template" arguments
+So, list is basically a vector of Any elements
+
+operators `Vec`, `Set`, `List` can be used to convert between the types
+*/
 
 /*
     Definitions
 */
 
-bool vec_eq(vector<string>& v1, vector<string>& v2);
+//lower number means higher priority [0,16)
+//0 - highest priority
+//15 - lowest priority
+unordered_map<string, int> op_order;
+const int OP_HIGH_PRI = 0;
+const int OP_LOW_PRI = 15;
 
 /*
-    Static Data
+    Functions
 */
 
-vector<string> type_names = {"Any", "Int", "Float", "Bool", "Str"};
+void init_op_order() {
+    op_order["="] = OP_LOW_PRI; //both sides get evaluated first
+    op_order["repeat"] = OP_LOW_PRI-2;
+    op_order["+"] = OP_HIGH_PRI+5;
+    op_order["*"] = OP_HIGH_PRI+4;
+}
 
 /*
     Structs
 */
 
-struct EnvVar {
-    string name;
-    int type_num;
-    void* data; //int, float and bool are literals, otherwise pointer to an object; type specified by type_num
+struct Env {
+    unordered_map<string, RRObj> vars;
+    unordered_map<string, vector<RRFun>> funs;
 
-    string type_name() { return type_names[type_num]; }
-};
-
-struct EnvFun {
-    string name;
-    vector<vector<string>> params;
-    vector<void*> cpp_fun; //if nullptr, use rr_fun instead
-    vector<TokenNode*> rr_fun; //if nullptr, use cpp_fun instead
-};
-
-// Environment takes ownership of: RR function pointers, EnvVar data pointers
-struct Environment {
-    vector<EnvVar> vars;
-    vector<EnvFun> funs;
-
-    static Environment new_empty() {
-        return Environment { vector<EnvVar>(0) };
+    Env() {
+        vars = {};
+        funs = {};
+        funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_add_int));
+        funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
+        funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Float")}, float_add_float));
+        funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Int")}, float_add_int));
+        funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, str_add_str));
+        funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
+        funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
     }
 
-    void add_var(EnvVar var) {
-        vars.push_back(var);
+    RRObj get_var(string name) {
+        if(vars.find(name) == vars.end()) {
+            return vars[name]; //DEAL WITH THIS CASE SOMEHOW
+        }
+        return vars[name];
     }
-
-    // leave cpp_fun or rr_fun nullptr
-    void add_fun(string name, vector<string> params, void* cpp_fun, TokenNode* rr_fun) {
-        //check every existing function for the same name as a new function
-        for(int i = 0; i < funs.size(); i++) {
-            if(funs[i].name == name) {
-                //check every existing function with that name for the same parameters as a new function
-                for(int j = 0; j < funs[i].params.size(); j++) {
-                    if(vec_eq(funs[i].params[j], params)) {
-                        //delete the old rr_fun
-                        delete_tree(funs[i].rr_fun[j]);
-                        funs[i].params[j] = params;
-                        funs[i].cpp_fun[j] = cpp_fun;
-                        funs[i].rr_fun[j] = rr_fun;
-                        return;
-                    }
-                }
-                funs[i].params.push_back(params);
-                funs[i].cpp_fun.push_back(cpp_fun);
-                funs[i].rr_fun.push_back(rr_fun);
-                return;
+    RRFun get_fun(string name, vector<RRDataType> arg_types) {
+        if(funs.find(name) == funs.end()) {
+            return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
+        }
+        for(RRFun f : funs[name]) {
+            //check if `f.params` vector is equal to `arg_types` vector
+            if(f.params == arg_types) {
+                return f;
             }
         }
-        funs.push_back( EnvFun { name, { params }, { cpp_fun }, { rr_fun } } );
+        return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
+    }
+    RRObj assign_var(string name, RRObj obj) {
+        vars[name] = obj;
+        return obj;
     }
 };
-
-/*
-    Helper Functions
-*/
-
-bool vec_eq(vector<string>& v1, vector<string>& v2) {
-    if(v1.size() != v2.size()) return false;
-    for(int i = 0; i < v1.size(); i++) {
-        if(v1[i] != v2[i]) return false;
-    }
-    return true;
-}

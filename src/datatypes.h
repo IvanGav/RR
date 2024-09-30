@@ -26,7 +26,7 @@ unordered_map<string, int> datatypes_num;
 const int DATATYPE_ANY = datatypes.size()-1;
 
 //call once as part of program setup
-void datatypes_init() {
+void init_datatypes() {
     for(int i = 0; i < datatypes.size(); i++) {
         datatypes_num[datatypes[i]] = i;
     }

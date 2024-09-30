@@ -1,162 +1,201 @@
-// Get a string and return an iterator over whitespace separated tokens.
-// Newline is returned as a separate token ('\n' character is returned when encountering any number of newlines).
+// For format, refer to ../syntax.md
 
 #pragma once
 
 #include <string>
 #include <vector>
-
-// #include <iostream>
+#include <unordered_map>
 
 using namespace std;
 
 /*
-    Data types
+    Definitions
 */
 
 enum TokenType {
-    VAL /* represents a literal of any integral type */,
-    T_SYMBOL,
-    T_DELIM, /* TokenTypeSpecifier doesn't matter */
+    T_NEWLINE,
+    T_DELIM,
+    T_LITERAL, //L_
+    T_SYMBOL, //S_
     T_NONE
 };
 
-enum TokenTypeSpecifier {
-    T_INT, T_FLOAT, T_BOOL, T_STR,
-    VAR,
-    FUN, OP,
-    BUILTIN, TYPE,
-    UNDEF
+enum TokenInfo {
+    L_INT, L_FLOAT, L_BOOL, L_STR,
+    S_LETTER, S_SPECIAL
 };
+
+enum CharType {
+    C_LETTER,
+    C_NUMBER,
+    C_DELIM,
+    C_WHITESPACE,
+    C_NEWLINE,
+    C_STR, //quotation marks `"`
+    C_SPECIAL, //anything else: `+=-*/<>~!@#$%^&|` etc
+};
+
+/*
+    Structs
+*/
 
 struct Token {
+    string t;
     TokenType type;
-    TokenTypeSpecifier type_spec;
-    string data;
+    TokenInfo info;
 };
 
-/*
-    Definitions
-*/
-bool is_delimiter(char c);
-bool is_int(string& str);
-Token get_token(string& str);
-struct Token;
-struct Tokenizer;
+struct CharClassifier {
+    unordered_map<char, CharType> chars;
 
-/*
-    Constatnts
-*/
-const Token NO_TOKENS = Token { TokenType::T_NONE, TokenTypeSpecifier::UNDEF, "" };
-const Token NEWLINE_TOKEN = Token { TokenType::T_DELIM, TokenTypeSpecifier::UNDEF, "\n" };
+    CharClassifier() {
+        //add letters
+        for(char c = 'a'; c <= 'z'; c++)
+            chars[c] = CharType::C_LETTER;
+        for(char c = 'A'; c <= 'Z'; c++)
+            chars[c] = CharType::C_LETTER;
+        chars['_'] = CharType::C_LETTER; //yes, underscore **is** a letter
+        //add numbers
+        for(char c = '0'; c <= '9'; c++)
+            chars[c] = CharType::C_NUMBER;
+        //add delimiters
+        chars['('] = CharType::C_DELIM;
+        chars[')'] = CharType::C_DELIM;
+        chars['['] = CharType::C_DELIM;
+        chars[']'] = CharType::C_DELIM;
+        chars['{'] = CharType::C_DELIM;
+        chars['}'] = CharType::C_DELIM;
+        chars['.'] = CharType::C_DELIM;
+        chars[','] = CharType::C_DELIM;
+        //add whitespaces
+        chars[' '] = CharType::C_WHITESPACE;
+        chars['\t'] = CharType::C_WHITESPACE;
+        chars['\r'] = CharType::C_WHITESPACE;
+        //add newlines
+        chars[';'] = CharType::C_NEWLINE;
+        chars['\n'] = CharType::C_NEWLINE;
+        //add string marker
+        chars['"'] = CharType::C_STR;
+        chars['\''] = CharType::C_STR;
+        //add symbols
+        chars['*'] = CharType::C_SPECIAL;
+        chars['+'] = CharType::C_SPECIAL;
+        chars['='] = CharType::C_SPECIAL;
+        chars['-'] = CharType::C_SPECIAL;
+        chars['/'] = CharType::C_SPECIAL;
+        chars['|'] = CharType::C_SPECIAL;
+        chars['\\'] = CharType::C_SPECIAL;
+        chars['&'] = CharType::C_SPECIAL;
+        chars['^'] = CharType::C_SPECIAL;
+        chars['%'] = CharType::C_SPECIAL;
+        chars['#'] = CharType::C_SPECIAL;
+        chars['!'] = CharType::C_SPECIAL;
+        chars['`'] = CharType::C_SPECIAL;
+        chars[':'] = CharType::C_SPECIAL;
+    }
 
-/*
-    Tokenizer struct
-*/
+    CharType type_of(char c) {
+        return chars[c];
+    }
+};
 
 struct Tokenizer {
-    vector<string> raw;
-    int at_line;
+    string source; //should always end with a newline
     int at_char;
+    CharClassifier cc;
 
-    static Tokenizer new_empty() {
-        return Tokenizer { vector<string>(0), 0, 0 };
+    static Tokenizer empty() {
+        return Tokenizer { "\n", 0, CharClassifier() };
     }
-    static Tokenizer new_from_str(string str) {
-        vector<string> vec;
-        vec.push_back(str);
-        return Tokenizer { vec, 0, 0 };
-    }
-    static Tokenizer new_from_vec(vector<string> vec) {
-        return Tokenizer { vec, 0, 0 };
+    static Tokenizer from_source(string source) {
+        return Tokenizer { source.append(1, '\n'), 0, CharClassifier() };
     }
 
-    //add a string to the queue of strings to be tokenized
-    void add_str(string str) {
-        raw.push_back(str);
+    //reset this tokenizer to have new source (and start from the beginning)
+    void set_source(string source) {
+        this->source = source.append(1, '\n');
+        this->at_char = 0;
     }
-    //for now, split around whitespace and treat newlines as a token
-    //return empty string when nothing else to read
+
+    //return the next token
     Token next() {
-        string str;
-        //if nothing else to read, return
-        if(at_line == raw.size()) return NO_TOKENS;
-        int size = raw[at_line].size();
-        //ignore whitespace
-        for(int i = at_char; i < size; i++) {
-            char c = raw[at_line][at_char];
-            if(c != ' ' && c != '\t') break;
+        //check for eof
+        if(done()) return Token { "", TokenType::T_NONE };
+        //skip whitespace
+        while(cc.type_of(source[at_char]) == CharType::C_WHITESPACE) at_char++;
+        //identify the first character to look at
+        CharType ctype = cc.type_of(source[at_char]);
+        //if found a newline, get it
+        if(ctype == CharType::C_NEWLINE) {
             at_char++;
+            return Token { "\n", TokenType::T_NEWLINE };  //it's ok to treat `;` as `\n`
         }
-        //check if at the end of a string
-        if(at_char == size) {
-            at_line++;
-            at_char = 0;
-            return NEWLINE_TOKEN;
-        }
-        //check for a delimiter
-        //return a string literal when encountered
-        if(is_delimiter(raw[at_line][at_char])) {
-            char c = raw[at_line][at_char];
+        //if found a delimiter, get it
+        if(ctype == CharType::C_DELIM) {
             at_char++;
-            if(c == '"') return Token { TokenType::VAL, TokenTypeSpecifier::T_STR, read_until(c) };
-            return Token { TokenType::T_DELIM, TokenTypeSpecifier::UNDEF, string() + c };
+            return Token { string() + prev_char(), TokenType::T_DELIM }; //delimiters are **always** 1 character long
         }
-        //read into `str`
-        for(int i = at_char; i < size; i++) {
-            char c = raw[at_line][at_char];
-            if(c == ' ' || is_delimiter(c)) break;
-            str += c;
+        string token_str;
+        //if found string or number, read a literal
+        if(ctype == CharType::C_STR) {
             at_char++;
-        }
-        //determine the type of token that is the resulting `str` and return
-        Token token = get_token(str);
-        return token;
-    }
-    //read until a specified character; ignore the character, when encountered
-    string read_until(char delim) {
-        string str;
-        //read into `str`
-        while(true) {
-            char c = raw[at_line][at_char];
-            if(c == delim) {
+            while(source[at_char] != '"') {
+                token_str += source[at_char];
                 at_char++;
-                break;
             }
-            str += c;
             at_char++;
-            if(at_char == raw[at_line].size()) {
-                at_line++;
-                at_char = 0;
-            }
-            if(at_line == raw.size()) {
-                break;
-            }
+            return Token { token_str, TokenType::T_LITERAL, TokenInfo::L_STR };
         }
-        return str;
+        if(ctype == CharType::C_NUMBER) {
+            bool is_float = false;
+            do {
+                if(source[at_char] == '.') is_float = true;
+                token_str += source[at_char];
+                at_char++;
+                ctype = cc.type_of(source[at_char]);
+            } while(ctype == CharType::C_NUMBER || (source[at_char] == '.' && !is_float));
+            return Token { token_str, TokenType::T_LITERAL, is_float ? TokenInfo::L_FLOAT : TokenInfo::L_INT };
+        }
+        //if found a letter, read a symbol until non-letter/number
+        if(ctype == CharType::C_LETTER) {
+            do {
+                token_str += source[at_char];
+                at_char++;
+                ctype = cc.type_of(source[at_char]);
+            } while(ctype == CharType::C_LETTER || ctype == CharType::C_NUMBER);
+            // at_char++;
+            return Token { token_str, TokenType::T_SYMBOL, TokenInfo::S_LETTER };
+        }
+        //read a symbol until non-special
+        if(ctype == CharType::C_SPECIAL) {
+            do {
+                token_str += source[at_char];
+                at_char++;
+                ctype = cc.type_of(source[at_char]);
+            } while(ctype == CharType::C_SPECIAL);
+            return Token { token_str, TokenType::T_SYMBOL, TokenInfo::S_SPECIAL };
+        }
+        return Token {"", TokenType::T_NONE};
+    }
+
+    //return all of the remaining tokens in a vector
+    vector<Token> tokenize() {
+        vector<Token> ts;
+        ts.push_back(next());
+        while(ts[ts.size()-1].type != TokenType::T_NONE) {
+            ts.push_back(next());
+        }
+        return ts;
+    }
+
+    //return whether read the whole string or not
+    bool done() {
+        return at_char >= source.size();
+    }
+    char get_char() {
+        return source[at_char];
+    }
+    char prev_char() {
+        return source[at_char-1];
     }
 };
-
-/*
-    Helper Functions
-*/
-
-bool is_delimiter(char c) {
-    return c == '\n' || c == '(' || c == ')' || c == '{' || c == '}' || c == '.' || c == ',' || c == ':' || c == ';' || c == '"' || c == '\'';
-}
-
-bool is_int(string& str) {
-    string::const_iterator it = str.begin();
-    if(*it == '-') it++;
-    while (it != str.end() && isdigit(*it)) it++;
-    return !str.empty() && it == str.end();
-}
-
-Token get_token(string& str) {
-    if(str == string("true") || str == string("false")) {
-        return Token { TokenType::VAL, TokenTypeSpecifier::T_BOOL, str };
-    } else if(is_int(str)) {
-        return Token { TokenType::VAL, TokenTypeSpecifier::T_INT, str };
-    }
-    return Token { TokenType::T_SYMBOL, TokenTypeSpecifier::UNDEF, str };
-}
