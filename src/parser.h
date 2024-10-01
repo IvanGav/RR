@@ -5,7 +5,6 @@
 
 #include <string>
 #include <vector>
-#include <variant>
 
 #include "datatypes.h"
 #include "rr_obj.h"
@@ -23,7 +22,8 @@ enum ASTType {
     STATEMENT, //a singular statement, consisting of one or more nodes
     LITERAL,
     VAR,
-    FUN, //== operator
+    FUN,
+    OP,
     IF,
     LOOP,
     FUN_DECL,
@@ -67,6 +67,7 @@ struct ASTNode {
         switch(type) {
             case ASTType::LITERAL: literal.~RRObj(); break;
             case ASTType::FUN: symbol.~string(); break;
+            case ASTType::OP: symbol.~string(); break;
             case ASTType::VAR: symbol.~string(); break;
             default: break; //STATEMENT
         }
@@ -102,10 +103,6 @@ struct ASTNode {
                 }
                 return children[children.size()-1]->eval(env);
             }; break;
-            case ASTType::IF: {
-            }; break;
-            case ASTType::LOOP: {
-            }; break;
             case ASTType::LITERAL: {
                 return literal;
             }; break;
@@ -113,6 +110,16 @@ struct ASTNode {
                 return env.get_var(symbol);
             }; break;
             case ASTType::FUN: {
+                vector<RRObj> args;
+                vector<RRDataType> types;
+                for(int i = 0; i < children.size(); i++) {
+                    args.push_back(children[i]->eval(env));
+                    types.push_back(args[i].type);
+                }
+                RRFun fun = env.get_fun(symbol, types);
+                return fun.cpp_fun(args);
+            }; break;
+            case ASTType::OP: {
                 if(symbol == "=") {
                     return env.assign_var(children[0]->symbol, children[1]->eval(env));
                 } else {
@@ -125,6 +132,10 @@ struct ASTNode {
                     RRFun fun = env.get_fun(symbol, types);
                     return fun.cpp_fun(args);
                 }
+            }; break;
+            case ASTType::IF: {
+            }; break;
+            case ASTType::LOOP: {
             }; break;
             case ASTType::FUN_DECL: {
             }; break;
@@ -143,6 +154,9 @@ struct ASTNode {
             }; break;
             case ASTType::FUN: {
                 os << "ASTNode<Fun>(" << node.symbol << ") with " << node.children.size() << " children:" << endl;
+            }; break;
+            case ASTType::OP: {
+                os << "ASTNode<Op>(" << node.symbol << ") with " << node.children.size() << " children:" << endl;
             }; break;
             case ASTType::STATEMENT: {
                 os << "ASTNode<Statement> with " << node.children.size() << " children:" << endl;
@@ -176,9 +190,9 @@ struct Parser {
         return parse_block_statement();
     }
 
-    //parse until reached newline; return the resulting AST
+    //parse until reached newline or `)`; return the resulting AST
     //REVISIT LATER
-    ASTNode* parse_line() {
+    ASTNode* parse_line(Env& env) {
         // cout << "----parsing a line" << endl;
         ASTNode* root = nullptr;
         while(!done) {
@@ -240,7 +254,7 @@ struct Parser {
 
     //parse until `}` is reached; return the resulting AST
     //expect **not** to see `{` as current element
-    ASTNode* parse_block_statement() {
+    ASTNode* parse_block_statement(Env& env) {
         ASTNode* root = new ASTNode(ASTType::STATEMENT, vector<ASTNode*>());
         while(!done) {
             switch(tokens[at_elem].type) {
@@ -274,48 +288,90 @@ struct Parser {
         //should never be reached
         return root;
     }
+
+    //parse and return just the next expression
+    //expression is an AST that is independent from any other code: literal, variable, function call, 
+    // () or {} expression, unary operator + other expression etc.
+    ASTNode* parse_next_expression(Env& env) {
+        switch(tokens[at_elem].type) {
+            case TokenType::T_DELIM: {
+                if(tokens[at_elem].t == "(") {
+                    at_elem++;
+                    return parse_line(env);
+                } else if(tokens[at_elem].t == "{") {
+                    at_elem++;
+                    return parse_block_statement(env);
+                } else if(tokens[at_elem].t == "}") {
+                    //expression must not start with a `}`
+                    parse_error("Reached end of statement when expected an expression");
+                } else if(tokens[at_elem].t == ")") {
+                    //expression must not start with a `)`
+                    parse_error("Reached end of statement when expected an expression");
+                } else {
+                    parse_error("Encountered an unknown delimiter");
+                }
+            }; break;
+            case TokenType::T_LITERAL: {
+                at_elem++;
+                return new ASTNode(ASTType::LITERAL, RRObj(tokens[at_elem-1]) );
+            }; break;
+            case TokenType::T_SYMBOL: {
+                if(env.is_op(tokens[at_elem].t)) {
+                    //all ops are funs
+                    ASTNode* new_node = new ASTNode(ASTType::OP, {}, tokens[at_elem].t); //read an operator
+                    at_elem++;
+                    new_node->children.push_back(parse_next_expression(env)); //put the next expression as its only operand
+                } else if(env.is_fun(tokens[at_elem].t)) {
+                    ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t); //read a function
+                    at_elem++;
+                    new_node->children.push_back(parse_next_expression(env)); //put the next expression as its only operand
+                } else {
+                    //is an operator
+                    ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t);
+                    root = insert_into_ast(root, new_node);
+                }
+                at_elem++;
+            }; break;
+            case TokenType::T_NEWLINE: {
+                parse_error("Reached end of line when expected an expression");
+            }; break;
+            case TokenType::T_NONE: {
+                parse_error("Reached end of file when expected an expression");
+            }; break;
+        }
+        //should never be reached
+        return nullptr;
+    }
 };
 
 /*
     Functions
 */
 
+void apply(ASTNode* fun, ASTNode* child) {
+    if(child->type == ASTType::CSV) {
+        //expand all values
+        for(int i = 0; i < child->children.size(); i++)
+            fun->children.push_back(child->children[i]);
+        delete child;
+    } else {
+        fun->children.push_back(child);
+    }
+}
+
 //Insert `to_insert` into `root`
+//assume *no* postfix operators allowed
 //REVISIT LATER
 ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert) {
     // cout << "----inserting into AST " << *to_insert << endl;
     if(root == nullptr) return to_insert;
     switch (to_insert->type) {
-        case ASTType::LITERAL: {
-            if(root->type == ASTType::FUN) {
-                //if can go lower, do it
-                if(root->children.size() == 2 && root->children[1]->type == ASTType::FUN) {
-                    root->children[1] = insert_into_ast(root->children[1], to_insert);
-                    return root;
-                } else {
-                    //if lowest, insert
-                    root->children.push_back(to_insert);
-                    return root;
-                }
-            }
-        }; break;
-        case ASTType::VAR: {
-            if(root->type == ASTType::FUN) {
-                //if can go lower, do it
-                if(root->children.size() == 2 && root->children[1]->type == ASTType::FUN) {
-                    root->children[1] = insert_into_ast(root->children[1], to_insert);
-                    return root;
-                } else {
-                    //if lowest, insert
-                    root->children.push_back(to_insert);
-                    return root;
-                }
-            }
-        }; break;
+        case ASTType::LITERAL:
+        case ASTType::VAR:
         case ASTType::STATEMENT: {
-            if(root->type == ASTType::FUN) {
+            if(root->type == ASTType::OP) {
                 //if can go lower, do it
-                if(root->children.size() == 2 && root->children[1]->type == ASTType::FUN) {
+                if(root->children.size() == 2 && root->children[1]->type == ASTType::OP) {
                     root->children[1] = insert_into_ast(root->children[1], to_insert);
                     return root;
                 } else {
@@ -393,5 +449,24 @@ if an operator is followed by another operator, the second operator ALWAYS gets 
 var/literal == same thing
 fun call == same, but expect args
 operator == connect expression and expression/(unary)operator
+
+*/
+
+/*
+
+when no postfix operators are allowed, there are 4 types of fun calls:
+- a op b
+- op a
+- fun(a,b,c)
+- a.fun(b,c,d)
+- a op (b,c,d) may be legal as well, but should not be aimed to be legal syntax
+
+in all cases after an operator(function) there is an operand(parameters) provided
+so, . indicates a function call where a calling object is the first parameter to the function
+in a way, that's similar to having a op (b,c), just fun being labeled as a function
+the difference between functions and operators is purely order of operations: operators' order of operations can be rearranged
+for that reason i should treat op and fn differently at the parser
+while they both execute things similarly, ops have an order/priority and fns don't
+for that logic ops are distinctly different from fns when parsing the tree
 
 */

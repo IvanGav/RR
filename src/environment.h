@@ -32,23 +32,15 @@ operators `Vec`, `Set`, `List` can be used to convert between the types
     Definitions
 */
 
-//lower number means higher priority [0,16)
-//0 - highest priority
-//15 - lowest priority
-unordered_map<string, int> op_order;
-const int OP_HIGH_PRI = 0;
-const int OP_LOW_PRI = 15;
+//higher number means higher priority [0,16)
+//0 - lowest priority
+//15 - highest priority
+const int OP_HIGH_PRI = 15;
+const int OP_LOW_PRI = 0;
 
 /*
     Functions
 */
-
-void init_op_order() {
-    op_order["="] = OP_LOW_PRI; //both sides get evaluated first
-    op_order["repeat"] = OP_LOW_PRI-2;
-    op_order["+"] = OP_HIGH_PRI+5;
-    op_order["*"] = OP_HIGH_PRI+4;
-}
 
 /*
     Structs
@@ -57,17 +49,22 @@ void init_op_order() {
 struct Env {
     unordered_map<string, RRObj> vars;
     unordered_map<string, vector<RRFun>> funs;
+    unordered_map<string, int> op_order;
 
-    Env() {
-        vars = {};
-        funs = {};
-        funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_add_int));
-        funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
-        funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Float")}, float_add_float));
-        funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Int")}, float_add_int));
-        funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, str_add_str));
-        funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
-        funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
+    static void init_with_default(Env& env) {
+        //init funs
+        env.funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_add_int));
+        env.funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
+        env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Float")}, float_add_float));
+        env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Int")}, float_add_int));
+        env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, str_add_str));
+        env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
+        env.funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
+        //init op_order
+        env.op_order["="] = OP_LOW_PRI; //both sides get evaluated first
+        env.op_order["repeat"] = OP_LOW_PRI+2;
+        env.op_order["+"] = OP_HIGH_PRI-5;
+        env.op_order["*"] = OP_HIGH_PRI-4;
     }
 
     RRObj get_var(string name) {
@@ -91,5 +88,14 @@ struct Env {
     RRObj assign_var(string name, RRObj obj) {
         vars[name] = obj;
         return obj;
+    }
+
+    //check whether the function list contains this name
+    bool is_fun(string name) {
+        return funs.find(name) == funs.end();
+    }
+    //if an operator order has been established for this name, it's an operator
+    bool is_op(string name) {
+        return op_order.find(name) != op_order.end();
     }
 };
