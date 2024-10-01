@@ -33,7 +33,7 @@ enum ASTType {
 
 struct ASTNode;
 
-ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert);
+ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert, Env& env);
 
 /*
     Structs
@@ -55,11 +55,13 @@ struct ASTNode {
         this->type = type;
         this->children = children;
     }
-    ASTNode(ASTType type, vector<ASTNode*> children, string symbol_name) {
+    ASTNode(ASTType type, vector<ASTNode*> children, string& symbol_name) {
         this->type = type;
         this->children = children;
-        // this->symbol;
-        // this->symbol = string(symbol_name);
+        new (&this->symbol) string(symbol_name);
+    }
+    ASTNode(ASTType type, string& symbol_name) {
+        this->type = type;
         new (&this->symbol) string(symbol_name);
     }
     ~ASTNode() {
@@ -109,16 +111,7 @@ struct ASTNode {
             case ASTType::VAR: {
                 return env.get_var(symbol);
             }; break;
-            case ASTType::FUN: {
-                vector<RRObj> args;
-                vector<RRDataType> types;
-                for(int i = 0; i < children.size(); i++) {
-                    args.push_back(children[i]->eval(env));
-                    types.push_back(args[i].type);
-                }
-                RRFun fun = env.get_fun(symbol, types);
-                return fun.cpp_fun(args);
-            }; break;
+            case ASTType::FUN:
             case ASTType::OP: {
                 if(symbol == "=") {
                     return env.assign_var(children[0]->symbol, children[1]->eval(env));
@@ -186,70 +179,65 @@ struct Parser {
     }
 
     //parse the whole token list; return a single statement node that holds all code
-    ASTNode* parse() {
-        return parse_block_statement();
+    ASTNode* parse(Env& env) {
+        return parse_block_statement(env);
     }
 
     //parse until reached newline or `)`; return the resulting AST
-    //REVISIT LATER
     ASTNode* parse_line(Env& env) {
-        // cout << "----parsing a line" << endl;
         ASTNode* root = nullptr;
         while(!done) {
             switch(tokens[at_elem].type) {
-                case TokenType::T_NEWLINE: {
-                    // cout << "----encountered a newline" << endl;
-                    //when reading a line, newline is the definitive end of statement
-                    at_elem++;
-                    return root;
-                }; break;
                 case TokenType::T_DELIM: {
-                    // cout << "----parsing a delim" << endl;
                     if(tokens[at_elem].t == "}") {
-                        //block statement ends without a newline
+                        //assume a block statement ends without a newline
                         return root;
                     }
                     if(tokens[at_elem].t == ")") {
-                        //assume this call has been for parentheses
+                        //assume this call has been for a parentheses expression
+                        // a definitive end of statement
                         at_elem++;
                         return new ASTNode(ASTType::STATEMENT, {root});
                     }
                     if(tokens[at_elem].t == "(") {
                         at_elem++;
-                        root = insert_into_ast(root, parse_line());
+                        root = insert_into_ast(root, parse_line(env));
                     }
                 }; break;
                 case TokenType::T_SYMBOL: {
-                    // cout << "----parsing a symbol" << endl;
-                    if(op_order.find(tokens[at_elem].t) == op_order.end()) {
-                        // cout << "--variable " << tokens[at_elem].t << endl;
-                        ASTNode* new_node = new ASTNode(ASTType::VAR, {}, tokens[at_elem].t);
-                        root = insert_into_ast(root, new_node);
+                    //after the initial expression, should only be infix operators
+                    if(root == nullptr) {
+                        root = parse_next_expression(env);
+                    } else if(env.is_op(tokens[at_elem].t)) {
+                        ASTNode* new_node = new ASTNode(ASTType::OP, {}, tokens[at_elem].t); //read an operator
+                        at_elem++;
+                        root = insert_into_ast(root, new_node, env);
                     } else {
-                        // cout << "--operator " << tokens[at_elem].t << endl;
-                        //is an operator
-                        ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t);
-                        root = insert_into_ast(root, new_node);
+                        // root = insert_into_ast(root, parse_next_expression(env));
+                        parse_error("Expected operator");
                     }
-                    at_elem++;
                 }; break;
                 case TokenType::T_LITERAL: {
-                    // cout << "----parsing a litral" << endl;
                     if(root == nullptr) {
-                        root = new ASTNode(ASTType::LITERAL, RRObj(tokens[at_elem]) );
+                        root = parse_next_expression(env);
                     } else {
-                        root = insert_into_ast(root, new ASTNode(ASTType::LITERAL, RRObj(tokens[at_elem]) ));
+                        parse_error("Expected operator");
                     }
+                }; break;
+                case TokenType::T_NEWLINE: {
+                    //when reading a line, newline is the definitive end of statement
                     at_elem++;
+                    return root;
                 }; break;
                 case TokenType::T_NONE: {
+                    //theoretically should not happen
                     done = true;
                     return root;
                 }; break;
             }
         }
         //should never be reached
-        return root;
+        return nullptr;
     }
 
     //parse until `}` is reached; return the resulting AST
@@ -258,26 +246,22 @@ struct Parser {
         ASTNode* root = new ASTNode(ASTType::STATEMENT, vector<ASTNode*>());
         while(!done) {
             switch(tokens[at_elem].type) {
-                case TokenType::T_NEWLINE: {
-                    //ignore
-                    at_elem++;
-                }; break;
                 case TokenType::T_DELIM: {
                     if(tokens[at_elem].t == "}") {
                         //when reading a block statement, closing brace is the definitive end of statement
                         at_elem++;
                         return root;
                     }
-                    ASTNode* line = parse_line();
+                    ASTNode* line = parse_line(env);
                     root->children.push_back(line);
                 }; break;
-                case TokenType::T_LITERAL: {
-                    ASTNode* line = parse_line();
-                    root->children.push_back(line);
-                }; break;
+                case TokenType::T_LITERAL: 
                 case TokenType::T_SYMBOL: {
-                    ASTNode* line = parse_line();
+                    ASTNode* line = parse_line(env);
                     root->children.push_back(line);
+                }; break;
+                case TokenType::T_NEWLINE: {
+                    at_elem++; //ignore
                 }; break;
                 case TokenType::T_NONE: {
                     done = true;
@@ -286,12 +270,13 @@ struct Parser {
             }
         }
         //should never be reached
-        return root;
+        return nullptr;
     }
 
     //parse and return just the next expression
     //expression is an AST that is independent from any other code: literal, variable, function call, 
     // () or {} expression, unary operator + other expression etc.
+    //do not try to look ahead; as soon as it can stop parsing, it will (`a + b` is *not* a single expression, but `+(a,b)` is)
     ASTNode* parse_next_expression(Env& env) {
         switch(tokens[at_elem].type) {
             case TokenType::T_DELIM: {
@@ -316,21 +301,23 @@ struct Parser {
                 return new ASTNode(ASTType::LITERAL, RRObj(tokens[at_elem-1]) );
             }; break;
             case TokenType::T_SYMBOL: {
+                //takes care of: unary ops, function-like op calls, functions, variables
                 if(env.is_op(tokens[at_elem].t)) {
                     //all ops are funs
                     ASTNode* new_node = new ASTNode(ASTType::OP, {}, tokens[at_elem].t); //read an operator
                     at_elem++;
-                    new_node->children.push_back(parse_next_expression(env)); //put the next expression as its only operand
+                    apply(new_node, parse_next_expression(env)); //put the next expression as its only operand
+                    return new_node;
                 } else if(env.is_fun(tokens[at_elem].t)) {
                     ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t); //read a function
                     at_elem++;
-                    new_node->children.push_back(parse_next_expression(env)); //put the next expression as its only operand
+                    apply(new_node, parse_next_expression(env)); //put the next expression as its only operand
+                    return new_node;
                 } else {
-                    //is an operator
-                    ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t);
-                    root = insert_into_ast(root, new_node);
+                    //assume a variable
+                    at_elem++;
+                    return new ASTNode(ASTType::VAR, tokens[at_elem-1].t);
                 }
-                at_elem++;
             }; break;
             case TokenType::T_NEWLINE: {
                 parse_error("Reached end of line when expected an expression");
@@ -349,7 +336,10 @@ struct Parser {
 */
 
 void apply(ASTNode* fun, ASTNode* child) {
-    if(child->type == ASTType::CSV) {
+    if(
+        (child->type == ASTType::CSV) ||
+        (child->type == ASTType::STATEMENT && child->children.size() == 1)
+    ) {
         //expand all values
         for(int i = 0; i < child->children.size(); i++)
             fun->children.push_back(child->children[i]);
@@ -360,28 +350,10 @@ void apply(ASTNode* fun, ASTNode* child) {
 }
 
 //Insert `to_insert` into `root`
-//assume *no* postfix operators allowed
-//REVISIT LATER
-ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert) {
-    // cout << "----inserting into AST " << *to_insert << endl;
-    if(root == nullptr) return to_insert;
+ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert, Env& env) {
+    if(root == nullptr) return to_insert; //should not be needed anymore
     switch (to_insert->type) {
-        case ASTType::LITERAL:
-        case ASTType::VAR:
-        case ASTType::STATEMENT: {
-            if(root->type == ASTType::OP) {
-                //if can go lower, do it
-                if(root->children.size() == 2 && root->children[1]->type == ASTType::OP) {
-                    root->children[1] = insert_into_ast(root->children[1], to_insert);
-                    return root;
-                } else {
-                    //if lowest, insert
-                    root->children.push_back(to_insert);
-                    return root;
-                }
-            }
-        }; break;
-        case ASTType::FUN: {
+        case ASTType::OP: {
             if(root->type == ASTType::FUN) {
                 if(op_order[to_insert->symbol] >= op_order[root->symbol]) {
                     to_insert->children.push_back(root);
@@ -395,6 +367,12 @@ ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert) {
                 to_insert->children.push_back(root);
                 return to_insert;
             }
+        }; break;
+        case ASTType::LITERAL:
+        case ASTType::VAR:
+        case ASTType::STATEMENT:
+        case ASTType::FUN: {
+            parse_error("Trying to insert a literal, variable, statement or a function call");
         }; break;
         case ASTType::IF: break;
         case ASTType::LOOP: break;
