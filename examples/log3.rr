@@ -1,4 +1,5 @@
 log = "Logsday!"
 log_num = 3
+rep_num = (2+1)*2
 
-log + " log #" + log_num + " " repeat 4
+log + " log #" + log_num + " " repeat rep_num

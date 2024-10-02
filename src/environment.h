@@ -60,6 +60,7 @@ struct Env {
         env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, str_add_str));
         env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
         env.funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
+        env.funs["round"].push_back(RRFun({RRDataType("Float")}, round_float));
         //init op_order
         env.op_order["="] = OP_LOW_PRI; //both sides get evaluated first
         env.op_order["repeat"] = OP_LOW_PRI+2;
@@ -67,13 +68,13 @@ struct Env {
         env.op_order["*"] = OP_HIGH_PRI-4;
     }
 
-    RRObj get_var(string name) {
+    RRObj get_var(string& name) {
         if(vars.find(name) == vars.end()) {
             return vars[name]; //DEAL WITH THIS CASE SOMEHOW
         }
         return vars[name];
     }
-    RRFun get_fun(string name, vector<RRDataType> arg_types) {
+    RRFun get_fun(string& name, vector<RRDataType> arg_types) {
         if(funs.find(name) == funs.end()) {
             return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
         }
@@ -85,17 +86,22 @@ struct Env {
         }
         return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
     }
-    RRObj assign_var(string name, RRObj obj) {
+    RRObj assign_var(string& name, RRObj obj) {
         vars[name] = obj;
         return obj;
     }
 
     //check whether the function list contains this name
-    bool is_fun(string name) {
-        return funs.find(name) == funs.end();
+    bool is_fun(string& name) {
+        return funs.find(name) != funs.end();
     }
     //if an operator order has been established for this name, it's an operator
-    bool is_op(string name) {
+    bool is_op(string& name) {
         return op_order.find(name) != op_order.end();
+    }
+
+    //return true if right operator has higher priority than left operator
+    bool op_priority_higher(string& lop, string& rop) {
+        return op_order[rop] > op_order[lop];
     }
 };

@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
+#include <cmath>
 
 #include "datatypes.h"
 #include "tokenizer.h"
@@ -55,4 +56,11 @@ RRObj str_repeat_int(vector<RRObj> args) {
     for(int i = 0; i < args[1].data_int; i++)
         *(new_str.data_str) += *(args[0].data_str);
     return new_str;
+}
+
+// float `round` operator
+RRObj round_float(vector<RRObj> args) {
+    args[0].data_int = llround(args[0].data_float);
+    args[0].type = RRDataType("Int");
+    return args[0];
 }

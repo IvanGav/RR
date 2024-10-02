@@ -1,0 +1,8 @@
+b = "Imma " + {
+    v = "fieri"
+    v + "n"
+}
+
+b + {
+    " mah " + "lazer"
+} + " BW" + ("AA" repeat 10) + "..."

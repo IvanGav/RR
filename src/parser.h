@@ -32,8 +32,7 @@ enum ASTType {
 };
 
 struct ASTNode;
-
-ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert, Env& env);
+void apply_operands(ASTNode* fun, ASTNode* child);
 
 /*
     Structs
@@ -65,7 +64,6 @@ struct ASTNode {
         new (&this->symbol) string(symbol_name);
     }
     ~ASTNode() {
-        // cout << "--destructor for ASTNode is called" << endl;
         switch(type) {
             case ASTType::LITERAL: literal.~RRObj(); break;
             case ASTType::FUN: symbol.~string(); break;
@@ -75,7 +73,6 @@ struct ASTNode {
         }
     }
     ASTNode& operator=(const ASTNode& val) {
-        // cout << "--operator= for ASTNode is called" << endl;
         // Nothing to do in case of self-assignment
         if (&val != this) {
             switch(type) {
@@ -113,6 +110,7 @@ struct ASTNode {
             }; break;
             case ASTType::FUN:
             case ASTType::OP: {
+                //funny thing is that `=(ten, 10)` is not a legal assignment function call
                 if(symbol == "=") {
                     return env.assign_var(children[0]->symbol, children[1]->eval(env));
                 } else {
@@ -157,6 +155,9 @@ struct ASTNode {
             case ASTType::VAR: {
                 os << "ASTNode<Var>(" << node.symbol << ") with " << node.children.size() << " children:" << endl;
             }; break;
+            default: {
+                os << "ASTNode<NotHandled> with " << node.children.size() << " children:" << endl;
+            }; break;
         }
         for(int i = 0; i < node.children.size(); i++) {
             os << *(node.children[i]);
@@ -192,16 +193,18 @@ struct Parser {
                     if(tokens[at_elem].t == "}") {
                         //assume a block statement ends without a newline
                         return root;
-                    }
-                    if(tokens[at_elem].t == ")") {
+                    } else if(tokens[at_elem].t == ")") {
                         //assume this call has been for a parentheses expression
                         // a definitive end of statement
                         at_elem++;
                         return new ASTNode(ASTType::STATEMENT, {root});
-                    }
-                    if(tokens[at_elem].t == "(") {
+                    } else if(tokens[at_elem].t == "(") {
                         at_elem++;
-                        root = insert_into_ast(root, parse_line(env));
+                        root = insert_op_into_ast(root, parse_line(env), env);
+                    } else if(tokens[at_elem].t == ",") {
+                        //code here...
+                    } else {
+                        parse_error("Invalid delimiter is found");
                     }
                 }; break;
                 case TokenType::T_SYMBOL: {
@@ -211,17 +214,17 @@ struct Parser {
                     } else if(env.is_op(tokens[at_elem].t)) {
                         ASTNode* new_node = new ASTNode(ASTType::OP, {}, tokens[at_elem].t); //read an operator
                         at_elem++;
-                        root = insert_into_ast(root, new_node, env);
+                        root = insert_op_into_ast(root, new_node, env);
                     } else {
                         // root = insert_into_ast(root, parse_next_expression(env));
-                        parse_error("Expected operator");
+                        parse_error("Expected operator but found a symbol");
                     }
                 }; break;
                 case TokenType::T_LITERAL: {
                     if(root == nullptr) {
                         root = parse_next_expression(env);
                     } else {
-                        parse_error("Expected operator");
+                        parse_error("Expected operator but found a literal");
                     }
                 }; break;
                 case TokenType::T_NEWLINE: {
@@ -303,15 +306,27 @@ struct Parser {
             case TokenType::T_SYMBOL: {
                 //takes care of: unary ops, function-like op calls, functions, variables
                 if(env.is_op(tokens[at_elem].t)) {
-                    //all ops are funs
-                    ASTNode* new_node = new ASTNode(ASTType::OP, {}, tokens[at_elem].t); //read an operator
+                    /*
+                        The reason I create a FUN not OP is:
+                        for expression `!1 + 2` where ! is a unary op, should i allow it to be interpreted like this - `!(1+2)`?
+                        if yes, there's a problem. the way how i parse the language, i can't distinguish between:
+                        - whether an operator is unary or not (aka prefix/function-like op call: `+(1,2)`)
+                        - whether this: `!(1)` is a function-like op call or a use of unary operator 
+                        so my answer is no, that's illegal
+                        effectively turning `!var` into a function call `!(var)`
+                        while it's possible to define all of that, for the time being i just declare that
+                        you **cannot** distribute operators into a unary operator (see first line)
+                        which also means unary operators always have the highest priority,
+                        practically making them just a function call, not really an op
+                    */
+                    ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t); //read an operator
                     at_elem++;
-                    apply(new_node, parse_next_expression(env)); //put the next expression as its only operand
+                    apply_operands(new_node, parse_next_expression(env)); //put the next expression as its only operand
                     return new_node;
                 } else if(env.is_fun(tokens[at_elem].t)) {
                     ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t); //read a function
                     at_elem++;
-                    apply(new_node, parse_next_expression(env)); //put the next expression as its only operand
+                    apply_operands(new_node, parse_next_expression(env)); //put the next expression as its only operand
                     return new_node;
                 } else {
                     //assume a variable
@@ -329,16 +344,59 @@ struct Parser {
         //should never be reached
         return nullptr;
     }
+
+    
+    //Insert infix op `to_insert` into `root`
+    //Note that it will automatically read the next expression and insert it as rhs for `to_insert`
+    ASTNode* insert_op_into_ast(ASTNode* root, ASTNode* to_insert, Env& env) {
+        if(root == nullptr) return to_insert; //should not be needed anymore
+        switch (to_insert->type) {
+            case ASTType::OP: {
+                if(root->type == ASTType::OP) {
+                    if(env.op_priority_higher(root->symbol, to_insert->symbol)) {
+                        root->children[root->children.size()-1] = insert_op_into_ast(root->children[root->children.size()-1], to_insert, env);
+                        return root;
+                    } else {
+                        to_insert->children.push_back(root);
+                        //an operator (to_insert) will take the next expression as right side argument
+                        apply_operands(to_insert, parse_next_expression(env));
+                        return to_insert;
+                    }
+                } else {
+                    //assume a value
+                    //an operator (to_insert) will take the next expression as right side argument
+                    to_insert->children.push_back(root);
+                    apply_operands(to_insert, parse_next_expression(env));
+                    return to_insert;
+                }
+            }; break;
+            case ASTType::LITERAL:
+            case ASTType::VAR:
+            case ASTType::STATEMENT:
+            case ASTType::FUN: {
+                parse_error("Trying to insert a literal, variable, statement or a function call");
+            }; break;
+            case ASTType::IF: break;
+            case ASTType::LOOP: break;
+            case ASTType::FUN_DECL: break;
+            case ASTType::RETURN: break;
+            case ASTType::CSV: break;
+        }
+        return nullptr;
+    }
 };
 
 /*
     Functions
 */
 
-void apply(ASTNode* fun, ASTNode* child) {
+//a funny lil function
+void apply_operands(ASTNode* fun, ASTNode* child) {
+    //if csv OR a statement with 1 non-operator child
+    //for not don't bother to unwrap more than 1 layer of redundant statements
     if(
         (child->type == ASTType::CSV) ||
-        (child->type == ASTType::STATEMENT && child->children.size() == 1)
+        (child->type == ASTType::STATEMENT && child->children.size() == 1 && child->children[0]->type != ASTType::OP)
     ) {
         //expand all values
         for(int i = 0; i < child->children.size(); i++)
@@ -347,40 +405,6 @@ void apply(ASTNode* fun, ASTNode* child) {
     } else {
         fun->children.push_back(child);
     }
-}
-
-//Insert `to_insert` into `root`
-ASTNode* insert_into_ast(ASTNode* root, ASTNode* to_insert, Env& env) {
-    if(root == nullptr) return to_insert; //should not be needed anymore
-    switch (to_insert->type) {
-        case ASTType::OP: {
-            if(root->type == ASTType::FUN) {
-                if(op_order[to_insert->symbol] >= op_order[root->symbol]) {
-                    to_insert->children.push_back(root);
-                    return to_insert;
-                } else {
-                    root->children[1] = insert_into_ast(root->children[1], to_insert);
-                    return root;
-                }
-            } else {
-                //assume a value
-                to_insert->children.push_back(root);
-                return to_insert;
-            }
-        }; break;
-        case ASTType::LITERAL:
-        case ASTType::VAR:
-        case ASTType::STATEMENT:
-        case ASTType::FUN: {
-            parse_error("Trying to insert a literal, variable, statement or a function call");
-        }; break;
-        case ASTType::IF: break;
-        case ASTType::LOOP: break;
-        case ASTType::FUN_DECL: break;
-        case ASTType::RETURN: break;
-        case ASTType::CSV: break;
-    }
-    return nullptr;
 }
 
 /*

@@ -7,8 +7,9 @@
 
 using namespace std;
 
+const bool DEBUG_MAIN = false;
+
 int main() {
-    init_op_order();
     init_datatypes();
 
     string source;
@@ -17,27 +18,32 @@ int main() {
         source += line;
         source += "\n";
     }
-    // cout << "--start source code:\n" << source << "\n--end source code." << endl;
+    if(DEBUG_MAIN) cout << "--start source code:\n" << source << "\n--end source code." << endl;
 
     vector<Token> ts = Tokenizer::from_source(source).tokenize();
+    
+    if(DEBUG_MAIN) {
+        cout << "--start listing tokens:\n" << endl;
+        for(int i = 0; i < ts.size(); i++) {
+            cout << "token: " << ts[i].type << ", " << ts[i].info << ": '" << ts[i].t << "'" << endl;
+        }
+        cout << "\n--end listing tokens." << endl;
+    }
 
-    // cout << "--start listing tokens:\n" << endl;
-    // for(int i = 0; i < ts.size(); i++) {
-    //     cout << "token: " << ts[i].type << ", " << ts[i].info << ": '" << ts[i].t << "'" << endl;
-    // }
-    // cout << "\n--end listing tokens." << endl;
-
-    ASTNode* compiled = Parser::from_tokens(ts).parse();
     Env env = Env();
+    Env::init_with_default(env);
+    ASTNode* compiled = Parser::from_tokens(ts).parse(env);
 
-    // cout << "--start print AST:\n" << endl;
-    // cout << *compiled << endl;
-    // cout << "\n--end print AST." << endl;
+    if(DEBUG_MAIN) {
+        cout << "--start print AST:\n" << endl;
+        cout << *compiled << endl;
+        cout << "\n--end print AST." << endl;
+    }
 
-    // cout << "--start eval:\n" << endl;
+    if(DEBUG_MAIN) cout << "--start eval:\n" << endl;
     RRObj return_val = compiled->eval(env);
     cout << return_val << endl;
-    // cout << "\n--end eval." << endl;
+    if(DEBUG_MAIN) cout << "\n--end eval." << endl;
 
     return 0;
 }
