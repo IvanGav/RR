@@ -8,6 +8,7 @@
 #include "datatypes.h"
 #include "rr_obj.h"
 #include "cpp_fun_impl.h"
+#include "rr_error.h"
 
 using namespace std;
 
@@ -61,6 +62,8 @@ struct Env {
         env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
         env.funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
         env.funs["round"].push_back(RRFun({RRDataType("Float")}, round_float));
+        env.funs["max"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, max_int_int));
+        env.funs["print"].push_back(RRFun({RRDataType("Str")}, print_str));
         //init op_order
         env.op_order["="] = OP_LOW_PRI; //both sides get evaluated first
         env.op_order["repeat"] = OP_LOW_PRI+2;
@@ -70,21 +73,28 @@ struct Env {
 
     RRObj get_var(string& name) {
         if(vars.find(name) == vars.end()) {
-            return vars[name]; //DEAL WITH THIS CASE SOMEHOW
+            rr_runtime_error("Couldn't find a variable '"s + name + "'");
         }
         return vars[name];
     }
     RRFun get_fun(string& name, vector<RRDataType> arg_types) {
-        if(funs.find(name) == funs.end()) {
-            return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
-        }
-        for(RRFun f : funs[name]) {
-            //check if `f.params` vector is equal to `arg_types` vector
-            if(f.params == arg_types) {
-                return f;
+        if(funs.find(name) != funs.end()) {
+            for(RRFun f : funs[name]) {
+                //check if `f.params` vector is equal to `arg_types` vector
+                if(f.params == arg_types) {
+                    return f;
+                }
             }
         }
-        return funs[name][0]; //DEAL WITH THIS CASE SOMEHOW
+        //print an error
+        string arg_str = "";
+        for(int i = 0; i < arg_types.size()-1; i++) {
+            arg_str += single_type_of(arg_types[i].type);
+            arg_str += ",";
+        }
+        arg_str += single_type_of(arg_types[arg_types.size()-1].type);
+        rr_runtime_error("Couldn't find a function '"s + name + "<" + arg_str + ">'");
+        return RRFun();
     }
     RRObj assign_var(string& name, RRObj obj) {
         vars[name] = obj;

@@ -5,7 +5,7 @@
 
 using namespace std;
 
-void runtime_error(string error_message) {
+void rr_runtime_error(string error_message) {
     cout << "--RR: Runtime error: " << error_message << endl << "Aborting" << endl;
     exit(1);
 }

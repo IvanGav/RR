@@ -64,3 +64,15 @@ RRObj round_float(vector<RRObj> args) {
     args[0].type = RRDataType("Int");
     return args[0];
 }
+
+// int/int `max` function
+RRObj max_int_int(vector<RRObj> args) {
+    args[0].data_int = max(args[0].data_int, args[1].data_int);
+    return args[0];
+}
+
+// str `print` function
+RRObj print_str(vector<RRObj> args) {
+    cout << *args[0].data_str << endl;
+    return args[0];
+}

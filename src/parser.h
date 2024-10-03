@@ -45,6 +45,10 @@ struct ASTNode {
         string symbol;
     };
 
+    ASTNode(ASTType type) {
+        this->type = type;
+        this->children = {};
+    }
     ASTNode(ASTType type, RRObj rr_obj) {
         this->type = type;
         this->children = {};
@@ -132,7 +136,9 @@ struct ASTNode {
             }; break;
             case ASTType::RETURN: {
             }; break;
-            default: break;
+            case ASTType::CSV: {
+                rr_runtime_error("Reached a CSV Node");
+            }; break;
         }
         parse_error(string("Invalid statement encountered: ")+to_string(type));
         return RRObj();
@@ -186,32 +192,37 @@ struct Parser {
 
     //parse until reached newline or `)`; return the resulting AST
     ASTNode* parse_line(Env& env) {
-        ASTNode* root = nullptr;
+        ASTNode* root = parse_next_expression(env);
         while(!done) {
             switch(tokens[at_elem].type) {
                 case TokenType::T_DELIM: {
                     if(tokens[at_elem].t == "}") {
                         //assume a block statement ends without a newline
+                        //cannot happen when `root` is null
                         return root;
                     } else if(tokens[at_elem].t == ")") {
                         //assume this call has been for a parentheses expression
                         // a definitive end of statement
                         at_elem++;
                         return new ASTNode(ASTType::STATEMENT, {root});
-                    } else if(tokens[at_elem].t == "(") {
-                        at_elem++;
-                        root = insert_op_into_ast(root, parse_line(env), env);
                     } else if(tokens[at_elem].t == ",") {
-                        //code here...
+                        at_elem++;
+                        if(root->type != ASTType::CSV) {
+                            root = new ASTNode(ASTType::CSV, {root});
+                        }
+                        root->children.push_back(parse_next_expression(env));
+                    } else if(tokens[at_elem].t == "(") {
+                        // at_elem++;
+                        // root = insert_op_into_ast(root, parse_line(env), env);
+                        //should not be reached - same as reaching a literal/variable/function call
+                        parse_error("Expected operator but found '('");
                     } else {
                         parse_error("Invalid delimiter is found");
                     }
                 }; break;
                 case TokenType::T_SYMBOL: {
                     //after the initial expression, should only be infix operators
-                    if(root == nullptr) {
-                        root = parse_next_expression(env);
-                    } else if(env.is_op(tokens[at_elem].t)) {
+                    if(env.is_op(tokens[at_elem].t)) {
                         ASTNode* new_node = new ASTNode(ASTType::OP, {}, tokens[at_elem].t); //read an operator
                         at_elem++;
                         root = insert_op_into_ast(root, new_node, env);
@@ -221,11 +232,7 @@ struct Parser {
                     }
                 }; break;
                 case TokenType::T_LITERAL: {
-                    if(root == nullptr) {
-                        root = parse_next_expression(env);
-                    } else {
-                        parse_error("Expected operator but found a literal");
-                    }
+                    parse_error("Expected operator but found a literal");
                 }; break;
                 case TokenType::T_NEWLINE: {
                     //when reading a line, newline is the definitive end of statement
@@ -356,6 +363,10 @@ struct Parser {
                     if(env.op_priority_higher(root->symbol, to_insert->symbol)) {
                         root->children[root->children.size()-1] = insert_op_into_ast(root->children[root->children.size()-1], to_insert, env);
                         return root;
+                    } else if(root->type == ASTType::CSV) {
+                        //always skip a CSV Node
+                        root->children[root->children.size()-1] = insert_op_into_ast(root->children[root->children.size()-1], to_insert, env);
+                        return root;
                     } else {
                         to_insert->children.push_back(root);
                         //an operator (to_insert) will take the next expression as right side argument
@@ -374,13 +385,15 @@ struct Parser {
             case ASTType::VAR:
             case ASTType::STATEMENT:
             case ASTType::FUN: {
-                parse_error("Trying to insert a literal, variable, statement or a function call");
+                parse_error("Trying to insert a literal, variable, statement or a function call instead of an operator");
             }; break;
-            case ASTType::IF: break;
-            case ASTType::LOOP: break;
-            case ASTType::FUN_DECL: break;
-            case ASTType::RETURN: break;
-            case ASTType::CSV: break;
+            case ASTType::IF:
+            case ASTType::LOOP:
+            case ASTType::FUN_DECL:
+            case ASTType::RETURN:
+            case ASTType::CSV: {
+                parse_error("Trying to insert an illegal expression instead of an operator");
+            }; break;
         }
         return nullptr;
     }
@@ -392,12 +405,15 @@ struct Parser {
 
 //a funny lil function
 void apply_operands(ASTNode* fun, ASTNode* child) {
-    //if csv OR a statement with 1 non-operator child
-    //for not don't bother to unwrap more than 1 layer of redundant statements
-    if(
-        (child->type == ASTType::CSV) ||
-        (child->type == ASTType::STATEMENT && child->children.size() == 1 && child->children[0]->type != ASTType::OP)
-    ) {
+    //if csv OR a statement with 1 non-operator child, unwrap
+    //unwrap until can't any longer
+    while(child->type == ASTType::STATEMENT && child->children.size() == 1 && child->children[0]->type != ASTType::OP) {
+        //can have multiple nested layers of statements
+        ASTNode* temp = child;
+        child = child->children[0];
+        delete temp;
+    }
+    if(child->type == ASTType::CSV) {
         //expand all values
         for(int i = 0; i < child->children.size(); i++)
             fun->children.push_back(child->children[i]);

@@ -7,9 +7,10 @@
 
 using namespace std;
 
-const bool DEBUG_MAIN = false;
+bool DEBUG_MAIN = false;
 
-int main() {
+int main(int argc, char** argv) {
+    if(argc > 1) DEBUG_MAIN = true;
     init_datatypes();
 
     string source;

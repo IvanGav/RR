@@ -90,6 +90,7 @@ struct RRFun {
     RRObj (*cpp_fun)(vector<RRObj>);
     void* rr_fun;
 
+    RRFun() {}
     RRFun(vector<RRDataType> params, RRObj (*cpp_fun)(vector<RRObj>)) {
         this->params = params;
         this->cpp_fun = cpp_fun;
