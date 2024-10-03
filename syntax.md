@@ -6,19 +6,19 @@ Every line is a statement. Every code block is a single statement. Every stateme
 
 Special statements:
 - `if` statement.
- - Syntax: `if (<condition>) { ... } else if (<condition>) { ... } else { ... }`
- - Return value: return value of the executed branch.
+  - Syntax: `if (<condition>) { ... } else if (<condition>) { ... } else { ... }`
+  - Return value: return value of the executed branch.
 - `while` loop.
- - Syntax: `while (<condition>) { ... }`
- - Return value: return value of the last loop.
+  - Syntax: `while (<condition>) { ... }`
+  - Return value: return value of the last loop.
 - `for` loop.
- - Syntax: `for (<var> in <iter>) { ... }`
- - Return value: return value of the last loop.
+  - Syntax: `for (<var> in <iter>) { ... }`
+  - Return value: return value of the last loop.
 - `loop` loop.
- - Syntax: `loop { ... }`
- - Return value: return value of the last loop.
+  - Syntax: `loop { ... }`
+  - Return value: return value of the last loop.
 - `switch` statement.
- - TODO
+  - TODO
 
 Special statements notes:
 - The `{ ... }` represents a statement and `<condition>` represents a statement with `bool` return type
@@ -31,21 +31,20 @@ Functions:
 - Can be defined with `fn <name> (<parameters>) { ... }`
 - Parameters may have a type specified: `<name>: <type>`
 - Operators can be defined with `op <name> (<parameters>) { ... }`
- - Operator name can contain any non-whitespace and non-delimiter (`.,()[]{}<>"`) symbols
- - Only `1` or `2` parameters are allowed, resulting in `prefix` or `infix` operators, respectively
- - To define an operator and a function with the same implementation, use `fn <fn_name> as op <op_name> (<parameters>) { ... }`
+  - Operator name may contain **ONE OF**:
+    - Letter characters ( and _ )
+    - Special characters ( non-letters, non-delimiters: "+-=;:\*/!&^%$#@", etc. )
+  - Only `1` or `2` parameters are allowed, resulting in `prefix` or `infix` operators, respectively
 
 Other special syntax:
 - `=` - assignment
 
 Built in Functions/Operators:
-- Functions:
- - `add`
 - Operators:
- - `+`
+  - `+`
 
 Integral Types:
-- int
-- float
-- bool
-- str
+- Int
+- Float
+- Bool
+- Str
