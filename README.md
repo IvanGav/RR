@@ -61,7 +61,7 @@ var
 Int: 13
 ```
 
-If statements are a single statement, meaning you can use them like this:
+Ifs are a single statement, meaning you can use them like this:
 ```rust
 var = if (10 == 10) "I know how to compare integers!" else "I don't know how to compare integers =("
 var
@@ -101,13 +101,10 @@ cool_op(2, 3)       //legal
 In actual interpreter, the only difference between `op`s and `fn`s, is that `op` names have a "operator priority number" attached to them, letting them be destributed as needed (order of operations!).
 
 ## Questionable design choices
-Last line of source code is its "output" => what gets printed (or use `print` function).
-
-To define a variable, just assign a name to a symbol. No need to declare. As a result, no scopes (besides function calls, in the future). Everything gets stored into the main scope.
-
-A language is modeled after R. ***R***. Even if I'm trying to fix all the wrongdoings of R, it's still going to be bad. Besides it's just going to be a generic uninteresting language (every programmer made a few).
-
-Many others that I will change too often to talk about them here =P
+- Last line of source code is its "output" => what gets printed (or use `print` function).
+- To define a variable, just assign a name to a symbol. No need to declare. As a result, no scopes (besides function calls, in the future). Everything gets stored into the main scope.
+- A language is modeled after R. ***R***. Even if I'm trying to fix all the wrongdoings of R, it's still going to be bad. Besides it's just going to be a generic uninteresting language (every programmer made a few).
+- Many others that I will change too often to talk about them here =P
 
 # I love it, how do I use it? (<-me btw, probably not you)
 
@@ -115,7 +112,7 @@ Many others that I will change too often to talk about them here =P
 - `$ cd RR`
 - `$ make`
 - `$ ./a.out < <rr_source_file>`
- - or just type a single line of input into stdin
+  - or just type a single line of input into stdin
 - enjoy the output
 - if you want to look at a cool wall of text, use **ANY AMOUNT OF ARBITRARY** arguments to `a.out`
- - Example: `$ ./a.out R should not exist R should not exist R should not exist < examples/block_statement.rr`
+  - Example: `$ ./a.out R should not exist R should not exist R should not exist < examples/block_statement.rr`
