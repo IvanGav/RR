@@ -11,15 +11,14 @@
 #include "rr_obj.h"
 #include "environment.h"
 
+/*
+    add operators
+    <type>_add_<type>
+*/
+
 // int/int `+` operator
 RRObj int_add_int(vector<RRObj> args) {
     args[0].data_int += args[1].data_int;
-    return args[0];
-}
-
-// int/int `*` operator
-RRObj int_multiply_int(vector<RRObj> args) {
-    args[0].data_int *= args[1].data_int;
     return args[0];
 }
 
@@ -35,6 +34,12 @@ RRObj float_add_int(vector<RRObj> args) {
     return args[0];
 }
 
+// float/int `+` operator
+RRObj int_add_float(vector<RRObj> args) {
+    args[1].data_float += (double) args[0].data_int;
+    return args[1];
+}
+
 // str/str `+` operator
 RRObj str_add_str(vector<RRObj> args) {
     RRObj new_str = RRObj(RRDataType("Str"));
@@ -47,6 +52,12 @@ RRObj str_add_int(vector<RRObj> args) {
     RRObj new_str = RRObj(RRDataType("Str"));
     new_str.data_str = new string(*(args[0].data_str) + to_string(args[1].data_int));
     return new_str;
+}
+
+// int/int `*` operator
+RRObj int_multiply_int(vector<RRObj> args) {
+    args[0].data_int *= args[1].data_int;
+    return args[0];
 }
 
 // str/int `repeat` operator

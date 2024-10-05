@@ -29,10 +29,11 @@ enum ASTType {
     FUN_DECL,
     RETURN,
     CSV, //comma separated values
+    LIST_BUILDER
 };
 
 struct ASTNode;
-void apply_operands(ASTNode* fun, ASTNode* child);
+ASTNode* apply_operands(ASTNode* fun, ASTNode* child);
 
 /*
     Structs
@@ -139,6 +140,13 @@ struct ASTNode {
             case ASTType::CSV: {
                 rr_runtime_error("Reached a CSV Node");
             }; break;
+            case ASTType::LIST_BUILDER: {
+                RRObj list_obj = RRObj(new vector<RRObj>());
+                for(int i = 0; i < children.size(); i++) {
+                    list_obj.data_vec->push_back(children[i]->eval(env));
+                }
+                return list_obj;
+            }; break;
         }
         parse_error(string("Invalid statement encountered: ")+to_string(type));
         return RRObj();
@@ -205,6 +213,11 @@ struct Parser {
                         // a definitive end of statement
                         at_elem++;
                         return new ASTNode(ASTType::STATEMENT, {root});
+                    } else if(tokens[at_elem].t == "]") {
+                        //assume this call has been for a list builder/index
+                        // a definitive end of statement
+                        at_elem++;
+                        return new ASTNode(ASTType::STATEMENT, {root});
                     } else if(tokens[at_elem].t == ",") {
                         at_elem++;
                         if(root->type != ASTType::CSV) {
@@ -216,6 +229,9 @@ struct Parser {
                         // root = insert_op_into_ast(root, parse_line(env), env);
                         //should not be reached - same as reaching a literal/variable/function call
                         parse_error("Expected operator but found '('");
+                    } else if(tokens[at_elem].t == "[") {
+                        //CHANGE LATER - SHOULD BE LEGAL
+                        parse_error("Expected operator but found '[': THIS IS A TEMPORARY ERROR");
                     } else {
                         parse_error("Invalid delimiter is found");
                     }
@@ -296,12 +312,19 @@ struct Parser {
                 } else if(tokens[at_elem].t == "{") {
                     at_elem++;
                     return parse_block_statement(env);
+                } else if(tokens[at_elem].t == "[") {
+                    //when parsing `[` as an expression, assume it's a list builder, not collection index
+                    at_elem++;
+                    return apply_operands(new ASTNode(ASTType::LIST_BUILDER), parse_line(env));
                 } else if(tokens[at_elem].t == "}") {
                     //expression must not start with a `}`
-                    parse_error("Reached end of statement when expected an expression");
+                    parse_error("Reached end of statement ('}') when expected an expression");
                 } else if(tokens[at_elem].t == ")") {
                     //expression must not start with a `)`
-                    parse_error("Reached end of statement when expected an expression");
+                    parse_error("Reached end of statement (')') when expected an expression");
+                } else if(tokens[at_elem].t == "]") {
+                    //expression must not start with a `)`
+                    parse_error("Reached end of statement (']') when expected an expression");
                 } else {
                     parse_error("Encountered an unknown delimiter");
                 }
@@ -404,7 +427,7 @@ struct Parser {
 */
 
 //a funny lil function
-void apply_operands(ASTNode* fun, ASTNode* child) {
+ASTNode* apply_operands(ASTNode* fun, ASTNode* child) {
     //if csv OR a statement with 1 non-operator child, unwrap
     //unwrap until can't any longer
     while(child->type == ASTType::STATEMENT && child->children.size() == 1 && child->children[0]->type != ASTType::OP) {
@@ -421,6 +444,7 @@ void apply_operands(ASTNode* fun, ASTNode* child) {
     } else {
         fun->children.push_back(child);
     }
+    return fun;
 }
 
 /*

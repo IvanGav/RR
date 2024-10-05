@@ -57,12 +57,10 @@ struct RRObj {
         type = RRDataType();
         data_int = 0;
     }
-
     RRObj(RRDataType t) {
         type = t;
         data_int = 0;
     }
-
     RRObj(Token t) {
         this->type = RRDataType(t);
         switch(t.info) {
@@ -73,6 +71,10 @@ struct RRObj {
             default: break;
         }
     }
+    RRObj(vector<RRObj>* list) {
+        type = RRDataType("List");
+        data_vec = list;
+    }
     
     friend std::ostream& operator<<(std::ostream& os, const RRObj& obj) {
         switch(obj.type.type) {
@@ -80,7 +82,44 @@ struct RRObj {
             case 1: return os << "Int: " << obj.data_int;
             case 2: return os << "Float: " << obj.data_float;
             case 3: return os << "Str: " << *(obj.data_str);
-            default: return os;
+            case 4: return os << "Pair: " << "(" << (obj.data_pair->first) << "," << (obj.data_pair->second) << ")";
+            case 5: {
+                if(obj.data_set->size() == 0) return os << "Set: {}";
+                os << "Set: {";
+                auto i = obj.data_set->begin();
+                while(true) {
+                    os << *i;
+                    i++;
+                    if(i == obj.data_set->end()) break;
+                    os << ",";
+                }
+                return os << "}";
+            };
+            case 6: {
+                if(obj.data_vec->size() == 0) return os << "Vec: []";
+                os << "Vec: [";
+                auto i = obj.data_vec->begin();
+                while(true) {
+                    os << *i;
+                    i++;
+                    if(i == obj.data_vec->end()) break;
+                    os << ",";
+                }
+                return os << "]";
+            };
+            case 8: {
+                if(obj.data_vec->size() == 0) return os << "List: []";
+                os << "List: [";
+                auto i = obj.data_vec->begin();
+                while(true) {
+                    os << *i;
+                    i++;
+                    if(i == obj.data_vec->end()) break;
+                    os << ",";
+                }
+                return os << "]";
+            };
+            default: return os << "Unhandled type";
         }
     }
 };

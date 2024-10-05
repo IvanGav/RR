@@ -55,11 +55,12 @@ struct Env {
     static void init_with_default(Env& env) {
         //init funs
         env.funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_add_int));
-        env.funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
         env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Float")}, float_add_float));
         env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Int")}, float_add_int));
+        env.funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Float")}, int_add_float));
         env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, str_add_str));
         env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
+        env.funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
         env.funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
         env.funs["round"].push_back(RRFun({RRDataType("Float")}, round_float));
         env.funs["max"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, max_int_int));
