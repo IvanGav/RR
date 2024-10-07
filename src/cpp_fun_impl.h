@@ -87,3 +87,15 @@ RRObj print_str(vector<RRObj> args) {
     cout << *args[0].data_str << endl;
     return args[0];
 }
+
+// int `print` function
+RRObj print_int(vector<RRObj> args) {
+    cout << args[0].data_int << endl;
+    return args[0];
+}
+
+// any `print` function
+RRObj print_any(vector<RRObj> args) {
+    cout << args[0] << endl;
+    return args[0];
+}

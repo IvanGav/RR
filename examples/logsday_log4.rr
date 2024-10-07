@@ -1,0 +1,18 @@
+log4 = ["Hello", "everyone", "it's", "logsday", "log", 4]
+print( concat(log4, " ") + "!" )
+
+"I've done a few things, such as:"
+
+block_returns = {
+    blocks = 222
+    blocks = blocks*2
+    blocks
+}
+
+function_calls = max(block_returns, 1000)
+
+ifs = if (function_calls == 1000) { function_calls*2 } else { function_calls*10 }
+
+lists = ["Logsday", ifs]
+
+"See you next Logsday!"

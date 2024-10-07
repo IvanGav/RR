@@ -1,0 +1,6 @@
+var = 152
+print(var)
+var = 22*2
+print(var)
+var = "hello world"
+var

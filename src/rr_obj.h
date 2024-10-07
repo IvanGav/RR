@@ -30,12 +30,12 @@ struct RRDataType {
     }
 
     friend bool operator==(const RRDataType& lhs, const RRDataType& rhs) {
-        return lhs.type == rhs.type;
+        return lhs.equivalent_to(rhs);
     }
     //return true if this object is *equivalent* to rhs
     //rhs may include datatype `Any`
-    bool equivalent_to(RRDataType& rhs) {
-        return (*this == rhs) || rhs.type == DATATYPE_ANY;
+    bool equivalent_to(const RRDataType& rhs) const {
+        return (type == rhs.type) || rhs.type == DATATYPE_ANY;
     }
 };
 

@@ -115,9 +115,12 @@ struct ASTNode {
             }; break;
             case ASTType::FUN:
             case ASTType::OP: {
-                //funny thing is that `=(ten, 10)` is not a legal assignment function call
+                //funny thing is that `=(ten, 10)` is now a legal assignment function call
                 if(symbol == "=") {
-                    return env.assign_var(children[0]->symbol, children[1]->eval(env));
+                    // return env.assign_var(children[0]->symbol, children[1]->eval(env));
+                    RRObj& obj = children[0]->eval_mut(env);
+                    obj = children[1]->eval(env);
+                    return obj;
                 } else {
                     vector<RRObj> args;
                     vector<RRDataType> types;
@@ -148,8 +151,24 @@ struct ASTNode {
                 return list_obj;
             }; break;
         }
-        parse_error(string("Invalid statement encountered: ")+to_string(type));
+        rr_runtime_error(string("Invalid statement encountered: ")+to_string(type));
         return RRObj();
+    }
+
+    RRObj& eval_mut(Env& env) {
+        switch (type) {
+            case ASTType::STATEMENT: {
+                for(int i = 0; i < children.size()-1; i++) {
+                    children[i]->eval(env);
+                }
+                return children[children.size()-1]->eval_mut(env);
+            }; break;
+            case ASTType::VAR: {
+                return env.get_var_or_new_mut(symbol); //allow the variables not to be previously created
+            }; break;
+            default: rr_runtime_error("Cannot mutably reference a non-variable");
+        }
+        rr_runtime_error(string("Invalid statement encountered (mutably): ")+to_string(type));
     }
 
     friend std::ostream& operator<<(std::ostream& os, const ASTNode& node) {
@@ -184,6 +203,8 @@ struct Parser {
     vector<Token> tokens;
     int at_elem;
     bool done;
+
+    ASTNode* last_node = nullptr; //TODO: SHOULD BE CHANGED LATER ON
 
     static Parser from_source(string source) {
         Tokenizer t = Tokenizer::from_source(source);
@@ -224,16 +245,15 @@ struct Parser {
                             root = new ASTNode(ASTType::CSV, {root});
                         }
                         root->children.push_back(parse_next_expression(env));
-                    } else if(tokens[at_elem].t == "(") {
-                        // at_elem++;
-                        // root = insert_op_into_ast(root, parse_line(env), env);
-                        //should not be reached - same as reaching a literal/variable/function call
-                        parse_error("Expected operator but found '('");
                     } else if(tokens[at_elem].t == "[") {
-                        //CHANGE LATER - SHOULD BE LEGAL
+                        //TODO: SHOULD BE LEGAL
                         parse_error("Expected operator but found '[': THIS IS A TEMPORARY ERROR");
+                    } else if(tokens[at_elem].t == "(") {
+                        parse_error("Expected operator but found '('");
+                    } else if(tokens[at_elem].t == "{") {
+                        parse_error("Expected operator but found '{'");
                     } else {
-                        parse_error("Invalid delimiter is found");
+                        parse_error("Invalid delimiter is found: "s + tokens[at_elem].t);
                     }
                 }; break;
                 case TokenType::T_SYMBOL: {
@@ -510,5 +530,53 @@ the difference between functions and operators is purely order of operations: op
 for that reason i should treat op and fn differently at the parser
 while they both execute things similarly, ops have an order/priority and fns don't
 for that logic ops are distinctly different from fns when parsing the tree
+
+*/
+
+/*
+
+so i have a *little* problem
+
+let's say this is the program:
+```rr
+arr = [1,2,3,4]
+arr[2] = arr[0]
+```
+
+when i parse the program and see `arr`, it's just a variable
+so i store it as a variable
+
+but then, i see that it has an index
+so i need to attach that index somehow to the variable
+
+but then i also need to do something similar with `fun(1,2,3)`, basically "injecting" the CSV into the function `fun`
+
+but then...
+
+i can have either of these:
+```rr
+fun(1,2,3)(4,5) // where `fun(1,2,3)` returns a function pointer, and i immideately call that function
+fun(1,2,3)[4] //where `fun(1,2,3)` returns an array, and i index into it
+```
+
+now i need several layers of `calls` or `indexes`
+and it can keep going, `fun(1)(3)(5)(7)...`, arbitrarily long
+so i'd probably need to stop storing `1` as a child of `fun` in `fun(1)`
+and make `fun` a child of `FunEval`
+but i'd also need to store `1` as a child of `FunEval` ASTNode (because it could've been `fun(1,2)` or `fun(1+2)`)
+and i'd also need to store indexing as `IndexInto` ASTNode
+I'd either need to store `fun` as the first or last element of that indexing operation
+
+but now i have 2 things to do:
+- all functions need to, after .eval, be converted into an RRObj, from RRFun; meaning wrapping function pointers as an object
+- i'd need to look for `(` or `[` as part of `parse_line` and emplace it instead of the last read thing; 
+though that's probably as easy as going down the operators and finding the first right-most non-op
+
+i also need to handle empty arguments! `fun()`
+
+in general, i'll need to research how it's actually done
+and ask Evan about how his datatypes work; i'll need that very soon
+
+all in all, indexing into arrays is not making it into logsday log 4
 
 */
