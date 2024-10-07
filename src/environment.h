@@ -61,14 +61,15 @@ struct Env {
         env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, str_add_str));
         env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
         env.funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
+        env.funs["=="].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_eq_int));
         env.funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
         env.funs["round"].push_back(RRFun({RRDataType("Float")}, round_float));
         env.funs["max"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, max_int_int));
-        // env.funs["print"].push_back(RRFun({RRDataType("Str")}, print_str));
-        // env.funs["print"].push_back(RRFun({RRDataType("Int")}, print_int));
         env.funs["print"].push_back(RRFun({RRDataType("Any")}, print_any));
+        env.funs["concat"].push_back(RRFun({RRDataType("List"), RRDataType("Str")}, concat_list_str));
         //init op_order
         env.op_order["="] = OP_LOW_PRI; //both sides get evaluated first
+        env.op_order["=="] = OP_LOW_PRI+1;
         env.op_order["repeat"] = OP_LOW_PRI+2;
         env.op_order["+"] = OP_HIGH_PRI-5;
         env.op_order["*"] = OP_HIGH_PRI-4;

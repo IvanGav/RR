@@ -11,8 +11,11 @@ block_returns = {
 
 function_calls = max(block_returns, 1000)
 
-ifs = if (function_calls == 1000) { function_calls*2 } else { function_calls*10 }
+ifs = if (function_calls == 444) { function_calls*2 } else { function_calls*10 }
 
-lists = ["Logsday", ifs]
+lists = [block_returns, "Logsday", ifs]
+
+print("lists should have '444', 'Logsday' and '10000'")
+print(lists)
 
 "See you next Logsday!"

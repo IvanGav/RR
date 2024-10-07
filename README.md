@@ -40,7 +40,7 @@ It's basically a fancy calculator in this state.
 - That's it... *for now*
 
 ## Dynamically typed
-It felt silly to prohibit dynamic typing, when it's literally built into the interpreter design. **I MIGHT CONSIDER MAKING IT STATICALLY TYPED FOR OPTIMIZATION**.
+It felt silly to prohibit dynamic typing, when it's literally built into the interpreter design. **I MIGHT CONSIDER MAKING IT STATICALLY TYPED FOR OPTIMIZATION**. I might also consider making it into a compiled language, though it's quite a big desicion too.
 
 But for now it's not statically typed. Though it's planned to let users specify the parameter data types when defining your own function (or just say `Any` and it'll accept whatever)... Whenever defining your own functions is implemented.
 
@@ -99,6 +99,14 @@ cool_op(2, 3)       //legal
 ```
 
 In actual interpreter, the only difference between `op`s and `fn`s, is that `op` names have a "operator priority number" attached to them, letting them be destributed as needed (order of operations!).
+
+To make a list, just use the "json" notation for lists:
+
+```rust
+list = [1,2,"i like cats",true,1]
+```
+
+Lists can hold any amount of arbitrary data. No indexing into lists yet, though =(
 
 ## Questionable design choices
 - Last line of source code is its "output" => what gets printed (or use `print` function).

@@ -47,7 +47,7 @@ struct RRObj {
         double data_float;
         bool data_bool;
         string* data_str;
-        vector<RRObj>* data_vec;
+        vector<RRObj>* data_list;
         unordered_set<RRObj>* data_set;
         unordered_map<RRObj, RRObj>* data_map;
         pair<RRObj, RRObj>* data_pair;
@@ -73,7 +73,7 @@ struct RRObj {
     }
     RRObj(vector<RRObj>* list) {
         type = RRDataType("List");
-        data_vec = list;
+        data_list = list;
     }
     
     friend std::ostream& operator<<(std::ostream& os, const RRObj& obj) {
@@ -96,25 +96,25 @@ struct RRObj {
                 return os << "}";
             };
             case 6: {
-                if(obj.data_vec->size() == 0) return os << "Vec: []";
+                if(obj.data_list->size() == 0) return os << "Vec: []";
                 os << "Vec: [";
-                auto i = obj.data_vec->begin();
+                auto i = obj.data_list->begin();
                 while(true) {
                     os << *i;
                     i++;
-                    if(i == obj.data_vec->end()) break;
+                    if(i == obj.data_list->end()) break;
                     os << ",";
                 }
                 return os << "]";
             };
             case 8: {
-                if(obj.data_vec->size() == 0) return os << "List: []";
+                if(obj.data_list->size() == 0) return os << "List: []";
                 os << "List: [";
-                auto i = obj.data_vec->begin();
+                auto i = obj.data_list->begin();
                 while(true) {
                     os << *i;
                     i++;
-                    if(i == obj.data_vec->end()) break;
+                    if(i == obj.data_list->end()) break;
                     os << ",";
                 }
                 return os << "]";

@@ -133,6 +133,12 @@ struct ASTNode {
                 }
             }; break;
             case ASTType::IF: {
+                //TODO: THIS ONLY WORKS FOR 1 IF 1 ELSE, REDO LATER
+                if(children[0]->eval(env).data_bool) {
+                    return children[1]->eval(env);
+                } else {
+                    return children[2]->eval(env);
+                }
             }; break;
             case ASTType::LOOP: {
             }; break;
@@ -146,13 +152,13 @@ struct ASTNode {
             case ASTType::LIST_BUILDER: {
                 RRObj list_obj = RRObj(new vector<RRObj>());
                 for(int i = 0; i < children.size(); i++) {
-                    list_obj.data_vec->push_back(children[i]->eval(env));
+                    list_obj.data_list->push_back(children[i]->eval(env));
                 }
                 return list_obj;
             }; break;
         }
         rr_runtime_error(string("Invalid statement encountered: ")+to_string(type));
-        return RRObj();
+        exit(1);
     }
 
     RRObj& eval_mut(Env& env) {
@@ -169,6 +175,7 @@ struct ASTNode {
             default: rr_runtime_error("Cannot mutably reference a non-variable");
         }
         rr_runtime_error(string("Invalid statement encountered (mutably): ")+to_string(type));
+        exit(1);
     }
 
     friend std::ostream& operator<<(std::ostream& os, const ASTNode& node) {
@@ -188,6 +195,9 @@ struct ASTNode {
             case ASTType::VAR: {
                 os << "ASTNode<Var>(" << node.symbol << ") with " << node.children.size() << " children:" << endl;
             }; break;
+            case ASTType::IF: {
+                os << "ASTNode<If> with " << node.children.size() << " children:" << endl;
+            }; break;
             default: {
                 os << "ASTNode<NotHandled> with " << node.children.size() << " children:" << endl;
             }; break;
@@ -203,8 +213,6 @@ struct Parser {
     vector<Token> tokens;
     int at_elem;
     bool done;
-
-    ASTNode* last_node = nullptr; //TODO: SHOULD BE CHANGED LATER ON
 
     static Parser from_source(string source) {
         Tokenizer t = Tokenizer::from_source(source);
@@ -264,7 +272,7 @@ struct Parser {
                         root = insert_op_into_ast(root, new_node, env);
                     } else {
                         // root = insert_into_ast(root, parse_next_expression(env));
-                        parse_error("Expected operator but found a symbol");
+                        parse_error("Expected operator but found a symbol: "s + tokens[at_elem].t);
                     }
                 }; break;
                 case TokenType::T_LITERAL: {
@@ -283,7 +291,8 @@ struct Parser {
             }
         }
         //should never be reached
-        return nullptr;
+        parse_error("Reached an unreachable part of 'parse_line'");
+        exit(1);
     }
 
     //parse until `}` is reached; return the resulting AST
@@ -316,7 +325,8 @@ struct Parser {
             }
         }
         //should never be reached
-        return nullptr;
+        parse_error("Reached an unreachable part of 'parse_block_statement'");
+        exit(1);
     }
 
     //parse and return just the next expression
@@ -354,8 +364,21 @@ struct Parser {
                 return new ASTNode(ASTType::LITERAL, RRObj(tokens[at_elem-1]) );
             }; break;
             case TokenType::T_SYMBOL: {
-                //takes care of: unary ops, function-like op calls, functions, variables
-                if(env.is_op(tokens[at_elem].t)) {
+                //takes care of: unary ops, function-like op calls, functions, variables, if/else
+                if(tokens[at_elem].t == "if") {
+                    at_elem++; //skip `if`
+                    ASTNode* if_statement = new ASTNode(ASTType::IF);
+                    if_statement->children.push_back(parse_next_expression(env)); //the condition
+                    if_statement->children.push_back(parse_next_expression(env)); //the if block
+                    if(tokens[at_elem].t != "else") {
+                        parse_error("'If' must have an 'else' clause: THIS IS A TEMPORARY ERROR");
+                    }
+                    at_elem++; //skip `else`
+                    if_statement->children.push_back(parse_next_expression(env)); //the else block
+                    return if_statement;
+                } else if(tokens[at_elem].t == "else") {
+                    parse_error("Cannot read 'else' without 'if'");
+                } else if(env.is_op(tokens[at_elem].t)) {
                     /*
                         The reason I create a FUN not OP is:
                         for expression `!1 + 2` where ! is a unary op, should i allow it to be interpreted like this - `!(1+2)`?
@@ -392,7 +415,8 @@ struct Parser {
             }; break;
         }
         //should never be reached
-        return nullptr;
+        parse_error("Reached an unreachable part of 'parse_next_expression'");
+        exit(1);
     }
 
     
@@ -438,7 +462,8 @@ struct Parser {
                 parse_error("Trying to insert an illegal expression instead of an operator");
             }; break;
         }
-        return nullptr;
+        parse_error("Reached an unreachable part of 'insert_op_into_ast'");
+        exit(1);
     }
 };
 
