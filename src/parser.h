@@ -89,10 +89,14 @@ struct ASTNode {
             type = val.type;
             children = val.children;
             switch(val.type) {
-                case ASTType::LITERAL: literal = val.literal; break;
-                case ASTType::FUN: symbol = val.symbol; break;
-                case ASTType::VAR: symbol = val.symbol; break;
-                default: break; //STATEMENT
+                case ASTType::LITERAL:
+                    literal = val.literal; break;
+                case ASTType::FUN:
+                case ASTType::VAR:
+                    new (&this->symbol) string(val.symbol);
+                    break;
+                default: 
+                    break; //STATEMENT
             }
         }
 
@@ -604,4 +608,118 @@ and ask Evan about how his datatypes work; i'll need that very soon
 
 all in all, indexing into arrays is not making it into logsday log 4
 
+*/
+
+/*
+
+what do i do for this:
+
+!(list)[1]
+
+it's probably the same as:
+
+!list[1]
+
+would be useful to make it so that it does this:
+
+!(list[1])
+
+so when i find an evaluation (`symbol(...)`) or index (`symbol[...]`), i insert them under the unary op (because it's an op)
+
+but what if i have this then:
+
+function(list)[1]
+
+when it's a function, it's distinctly taking `list` as an argument, before the index.
+
+so i either want to check if something is a unary op or a function and go off of that,
+or look if there are () around arguments, and then always treat it as a function call
+
+but the second solution is bad too, because of this example:
+
+!(list_from 5)[0]
+
+it would make sense to interpret it as:
+
+!((list_from 5)[0])
+
+and not
+
+(!(list_from 5))[0]
+
+and doing this would be against rules as well:
+
+!list_from 5[0]
+
+and can be avoided by doing
+
+!list_from(5)[0]
+
+but that seems jank and unintuitive
+but is this better?
+
+!((list_from 5)[0])
+
+ok but now this:
+
+!true || false
+
+is it
+(!true) || false
+
+or
+!(true || false)
+
+of course the correct answer is the first - `||` cannot be distributed into `!`
+but now i need to do different things on encountering evalutation/index vs operator... which is probably ok
+
+actually this seems ok all of a sudden:
+
+!list_from(5)[0] -> !(list_from(5)[0]) can be done for clarification
+
+but ! list_from 5 [0] is also clearly !list_from(5[0])
+
+so in my first example:
+
+!(list)[1]
+
+is actually not
+!list[1]
+
+but
+(!list)[1] <-> (!(list))[1]
+
+ok
+not what i expected to conclude, but ok
+
+can be changed later anyway so it's whatever
+
+so when i code, it means that whenever i see an operator, i read the next operand, as usual
+
+but when i see a symbol that's an operator in parse_next_expression, i should not unwrap statements
+
+arguments that are just arguments, are put as children for the unary op
+
+arguments that are statements, should be interpreted as evaluating nodes, taking the unary op as the child
+making it a function call
+
+after that any other evaluations or indexings, will be done to the result, not the operand
+
+wait that works out so beautifully actually
+i don't even need to make a node "unary_operator" as i was planning to... that's cool actually
+
+*/
+
+/*
+ASTNode (evaluate/index) n
+n.children[0] will be the function/collection
+- should return a function pointer object if an evaluate node
+  - function nodes should evaluate to function pointer objects
+- just return the collection as usual if index
+n.children[1] will be the operands/index
+- if index, just 1 element - n.children[1]
+  - either make a switch based on collection or call an index function for that collection... which is probably the way to do it
+- if evaluate, also have only 1 element - it will be a statement
+  - statement with 0 children is just a simple f() call
+  - statements with more children are: f(param1, param2, param3, ...)
 */
