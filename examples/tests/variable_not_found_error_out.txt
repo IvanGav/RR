@@ -1,0 +1,2 @@
+--RR: Runtime error: Couldn't find a variable 'val'
+Aborting

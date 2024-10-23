@@ -33,7 +33,7 @@ Functions:
 - Operators can be defined with `op <name> (<parameters>) { ... }`
   - Operator name may contain **ONE OF**:
     - Letter characters ( and _ )
-    - Special characters ( non-letters, non-delimiters: "+-=;:\*/!&^%$#@", etc. )
+    - Special characters ( non-letters, non-delimiters: `+-=;:\*/!&^%$#@`, etc. )
   - Only `1` or `2` parameters are allowed, resulting in `prefix` or `infix` operators, respectively
 
 Other special syntax:
@@ -47,4 +47,4 @@ Integral Types:
 - Int
 - Float
 - Bool
-- Str
+- Str (is heap allocated)

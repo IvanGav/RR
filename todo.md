@@ -1,7 +1,7 @@
 # TODO
-- variables can hold functions
-- if/while/for
+- change how function calls are made
 - arrays
+- while/for
 - pairs
 - other data structures
 - write functions in rr (+env scopes)

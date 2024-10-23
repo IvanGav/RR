@@ -7,6 +7,7 @@
 
 #include "datatypes.h"
 #include "tokenizer.h"
+#include "rr_error.h"
 
 using namespace std;
 
@@ -25,7 +26,7 @@ struct RRDataType {
             case TokenInfo::L_FLOAT: type = single_type_of("Float"); break;
             case TokenInfo::L_INT: type = single_type_of("Int"); break;
             case TokenInfo::L_STR: type = single_type_of("Str"); break;
-            default: type = single_type_of("Any"); break;
+            default: parse_error("Creating a DataType out of a non-literal token");
         }
     }
 
@@ -40,6 +41,8 @@ struct RRDataType {
 };
 
 //takes ownership of the data
+// TODO: add desctuctor
+// TODO: ensure no duplicate pointers to same data (with long life times)
 struct RRObj {
     RRDataType type;
     union {

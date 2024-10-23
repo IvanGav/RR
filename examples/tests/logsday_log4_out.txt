@@ -1,0 +1,4 @@
+Str: Hello everyone it's logsday log 4!
+Str: lists should have '444', 'Logsday' and '10000'
+List: [Int: 444,Str: Logsday,Int: 10000]
+Str: See you next Logsday!

@@ -1,3 +1,0 @@
-1. This is a test text.
-2. Delimiting () and {}
-3. Delimiting (this)and{this}
