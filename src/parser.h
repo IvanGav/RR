@@ -19,8 +19,8 @@ using namespace std;
 */
 
 enum ASTType {
-    STATEMENT, //a singular statement, consisting of one or more nodes
-    LITERAL,
+    STATEMENT, // a singular statement, consisting of one or more nodes; return last child's return value
+    LITERAL, // a node that directly contains the value returned by `eval`
     VAR,
     FUN,
     OP,
@@ -28,12 +28,13 @@ enum ASTType {
     LOOP,
     FUN_DECL,
     RETURN,
-    CSV, //comma separated values
-    LIST_BUILDER
+    CSV, //comma separated values; acts similar to statement, but returns vector<RRObj> when evaluated, containing all childrens' return values
+    EVALUATE, // evaluating a function means `fun(params...)`
+    INDEX, // indexing into a collection means `arr[index]`
+    LIST_BUILDER // list builder is invoked by `[comma, separated, elements]`
 };
 
 struct ASTNode;
-ASTNode* apply_operands(ASTNode* fun, ASTNode* child);
 
 /*
     Structs
@@ -250,7 +251,7 @@ struct Parser {
                         //assume this call has been for a list builder/index
                         // a definitive end of statement
                         at_elem++;
-                        return new ASTNode(ASTType::STATEMENT, {root});
+                        return root;
                     } else if(tokens[at_elem].t == ",") {
                         at_elem++;
                         if(root->type != ASTType::CSV) {
@@ -261,7 +262,15 @@ struct Parser {
                         //TODO: SHOULD BE LEGAL
                         parse_error("Expected operator but found '[': THIS IS A TEMPORARY ERROR");
                     } else if(tokens[at_elem].t == "(") {
-                        parse_error("Expected operator but found '('");
+                        //assume evaluation of previous item
+                        if(tokens[at_elem+1].t == ")") {
+                            //evaluate with no parameters - `f()`
+                            root = apply_evaluate_with_args(root, new ASTNode(ASTType::CSV));
+                            at_elem += 2;
+                        } else {
+                            ASTNode* args = parse_line(env);
+                            root = apply_evaluate_with_args(root, new ASTNode(ASTType::CSV));
+                        }
                     } else if(tokens[at_elem].t == "{") {
                         parse_error("Expected operator but found '{'");
                     } else {
@@ -349,7 +358,9 @@ struct Parser {
                 } else if(tokens[at_elem].t == "[") {
                     //when parsing `[` as an expression, assume it's a list builder, not collection index
                     at_elem++;
-                    return apply_operands(new ASTNode(ASTType::LIST_BUILDER), parse_line(env));
+                    ASTNode* elements = parse_line(env);
+                    if(elements->type != ASTType::CSV) elements = new ASTNode(ASTType::CSV, {elements});
+                    return new ASTNode(ASTType::LIST_BUILDER, {elements});
                 } else if(tokens[at_elem].t == "}") {
                     //expression must not start with a `}`
                     parse_error("Reached end of statement ('}') when expected an expression");
@@ -383,27 +394,18 @@ struct Parser {
                 } else if(tokens[at_elem].t == "else") {
                     parse_error("Cannot read 'else' without 'if'");
                 } else if(env.is_op(tokens[at_elem].t)) {
-                    /*
-                        The reason I create a FUN not OP is:
-                        for expression `!1 + 2` where ! is a unary op, should i allow it to be interpreted like this - `!(1+2)`?
-                        if yes, there's a problem. the way how i parse the language, i can't distinguish between:
-                        - whether an operator is unary or not (aka prefix/function-like op call: `+(1,2)`)
-                        - whether this: `!(1)` is a function-like op call or a use of unary operator 
-                        so my answer is no, that's illegal
-                        effectively turning `!var` into a function call `!(var)`
-                        while it's possible to define all of that, for the time being i just declare that
-                        you **cannot** distribute operators into a unary operator (see first line)
-                        which also means unary operators always have the highest priority,
-                        practically making them just a function call, not really an op
-                    */
-                    ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t); //read an operator
+                    ASTNode* new_node = new ASTNode(ASTType::OP, tokens[at_elem].t); //read an operator
                     at_elem++;
-                    apply_operands(new_node, parse_next_expression(env)); //put the next expression as its only operand
+                    if(tokens[at_elem].t != "(") {
+                        //it's indeed a unary operator usage
+                        new_node->children.push_back(parse_next_expression(env));
+                    }
+                    //else it's a function-like op call
                     return new_node;
                 } else if(env.is_fun(tokens[at_elem].t)) {
-                    ASTNode* new_node = new ASTNode(ASTType::FUN, {}, tokens[at_elem].t); //read a function
+                    ASTNode* new_node = new ASTNode(ASTType::FUN, tokens[at_elem].t); //read a function
                     at_elem++;
-                    apply_operands(new_node, parse_next_expression(env)); //put the next expression as its only operand
+                    // don't assume evaluation
                     return new_node;
                 } else {
                     //assume a variable
@@ -428,45 +430,29 @@ struct Parser {
     //Note that it will automatically read the next expression and insert it as rhs for `to_insert`
     ASTNode* insert_op_into_ast(ASTNode* root, ASTNode* to_insert, Env& env) {
         if(root == nullptr) return to_insert; //should not be needed anymore
-        switch (to_insert->type) {
-            case ASTType::OP: {
-                if(root->type == ASTType::OP) {
-                    if(env.op_priority_higher(root->symbol, to_insert->symbol)) {
-                        root->children[root->children.size()-1] = insert_op_into_ast(root->children[root->children.size()-1], to_insert, env);
-                        return root;
-                    } else if(root->type == ASTType::CSV) {
-                        //always skip a CSV Node
-                        root->children[root->children.size()-1] = insert_op_into_ast(root->children[root->children.size()-1], to_insert, env);
-                        return root;
-                    } else {
-                        to_insert->children.push_back(root);
-                        //an operator (to_insert) will take the next expression as right side argument
-                        apply_operands(to_insert, parse_next_expression(env));
-                        return to_insert;
-                    }
+        if(to_insert->type == ASTType::OP) {
+            if(root->type == ASTType::OP) {
+                if(env.op_priority_higher(root->symbol, to_insert->symbol)) {
+                    root->children.back() = insert_op_into_ast(root->children.back(), to_insert, env);
+                    return root;
                 } else {
-                    //assume a value
                     //an operator (to_insert) will take the next expression as right side argument
                     to_insert->children.push_back(root);
-                    apply_operands(to_insert, parse_next_expression(env));
+                    to_insert->children.push_back(parse_next_expression(env));
                     return to_insert;
                 }
-            }; break;
-            case ASTType::LITERAL:
-            case ASTType::VAR:
-            case ASTType::STATEMENT:
-            case ASTType::FUN: {
-                parse_error("Trying to insert a literal, variable, statement or a function call instead of an operator");
-            }; break;
-            case ASTType::IF:
-            case ASTType::LOOP:
-            case ASTType::FUN_DECL:
-            case ASTType::RETURN:
-            case ASTType::CSV: {
-                parse_error("Trying to insert an illegal expression instead of an operator");
-            }; break;
+            } else if(root->type == ASTType::CSV) {
+                //always skip a CSV Node
+                root->children.back() = insert_op_into_ast(root->children.back(), to_insert, env);
+                return root;
+            } else {
+                //an operator (to_insert) will take the next expression (root) as right side argument
+                to_insert->children.push_back(root);
+                to_insert->children.push_back(parse_next_expression(env));
+                return to_insert;
+            }
         }
-        parse_error("Reached an unreachable part of 'insert_op_into_ast'");
+        parse_error("Trying to insert an illegal expression instead of an operator");
         exit(1);
     }
 };
@@ -476,24 +462,31 @@ struct Parser {
 */
 
 //a funny lil function
-ASTNode* apply_operands(ASTNode* fun, ASTNode* child) {
-    //if csv OR a statement with 1 non-operator child, unwrap
-    //unwrap until can't any longer
-    while(child->type == ASTType::STATEMENT && child->children.size() == 1 && child->children[0]->type != ASTType::OP) {
-        //can have multiple nested layers of statements
-        ASTNode* temp = child;
-        child = child->children[0];
-        delete temp;
+ASTNode* apply_evaluate_with_args(ASTNode* root, ASTNode* args) {
+    if(root->type != ASTType::OP) {
+        return new ASTNode(ASTType::EVALUATE, {root, args});
     }
-    if(child->type == ASTType::CSV) {
-        //expand all values
-        for(int i = 0; i < child->children.size(); i++)
-            fun->children.push_back(child->children[i]);
-        delete child;
-    } else {
-        fun->children.push_back(child);
+    ASTNode* head = root;
+    //if an operator has no children, it can only mean that it's used as a function-like op call; meaning *do* apply args to it
+    while(head->children.back()->type == ASTType::OP && head->children.back()->children.size() != 0) {
+        head = head->children.back();
     }
-    return fun;
+    head->children.back() = new ASTNode(ASTType::EVALUATE, {head->children.back(), args});
+    return root;
+}
+
+//oh hey, another funny lil function
+ASTNode* apply_index(ASTNode* root, ASTNode* index) {
+    if(root->type != ASTType::OP) {
+        return new ASTNode(ASTType::INDEX, {root, index});
+    }
+    ASTNode* head = root;
+    while(head->children.back()->type == ASTType::OP) {
+        head = head->children.back();
+        if(head->children.size() == 0) parse_error("Trying to index into an operator");
+    }
+    head->children.back() = new ASTNode(ASTType::INDEX, {head->children.back(), index});
+    return root;
 }
 
 /*
