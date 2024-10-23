@@ -117,12 +117,22 @@ struct Tokenizer {
         this->at_char = 0;
     }
 
+    void skip_comments() {
+        if(source[at_char] == '/' && source[at_char+1] == '/') {
+            //is a comment, go until next newline and then skip spaces
+            at_char += 2;
+            while(cc.type_of(source[at_char]) != CharType::C_NEWLINE) at_char++;
+            while(cc.type_of(source[at_char]) == CharType::C_WHITESPACE) at_char++;
+        }
+    }
+
     //return the next token
     Token next() {
         //check for eof
         if(done()) return Token { "", TokenType::T_NONE };
-        //skip whitespace
+        //skip whitespace and comments
         while(cc.type_of(source[at_char]) == CharType::C_WHITESPACE) at_char++;
+        skip_comments();
         //identify the first character to look at
         CharType ctype = cc.type_of(source[at_char]);
         //if found a newline, get it

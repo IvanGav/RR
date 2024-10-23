@@ -1,0 +1,10 @@
+log5 = "Logsday log 5"
+
+// i didn't do much this week
+// i had a break week, so to say
+// also due to how i parse files, i can do this; log5 = log5 + "!"
+// that's because you can normally use semicolon instead of newline
+// though i can easily make it so that semicolon is not treated as a newline inside of comments
+// anyway, wait for more updates next logsday!
+
+log5 = log5 + "!!"; log5
