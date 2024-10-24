@@ -50,6 +50,7 @@ struct RRObj {
         double data_float;
         bool data_bool;
         string* data_str;
+        RRFun* data_fn;
         vector<RRObj>* data_list;
         unordered_set<RRObj>* data_set;
         unordered_map<RRObj, RRObj>* data_map;
@@ -77,6 +78,10 @@ struct RRObj {
     RRObj(vector<RRObj>* list) {
         type = RRDataType("List");
         data_list = list;
+    }
+    RRObj(RRFun* rr_fn) {
+        type = RRDataType("Fn");
+        data_fn = rr_fn;
     }
     
     friend std::ostream& operator<<(std::ostream& os, const RRObj& obj) {

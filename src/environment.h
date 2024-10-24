@@ -93,13 +93,13 @@ struct Env {
         }
         return vars[name];
     }
-    RRFun get_fun(string& name, vector<RRDataType> arg_types) {
+    RRFun* get_fun(string& name, vector<RRDataType> arg_types) {
         if(funs.find(name) != funs.end()) {
-            for(RRFun f : funs[name]) {
+            for(int i = 0; i < funs[name].size(); i++) {
                 //check if `f.params` vector is equal to `arg_types` vector
                 //and yes, it's important that function params are on the **right** (i know it's not a good practice)
-                if(arg_types == f.params) {
-                    return f;
+                if(arg_types == funs[name][i].params) {
+                    return &funs[name][i];
                 }
             }
         }
@@ -111,7 +111,7 @@ struct Env {
         }
         arg_str += single_type_of(arg_types[arg_types.size()-1].type);
         rr_runtime_error("Couldn't find a function '"s + name + "<" + arg_str + ">'");
-        return RRFun();
+        exit(1);
     }
     RRObj assign_var(string& name, RRObj obj) {
         vars[name] = obj;

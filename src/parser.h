@@ -110,7 +110,7 @@ struct ASTNode {
                 for(int i = 0; i < children.size()-1; i++) {
                     children[i]->eval(env);
                 }
-                return children[children.size()-1]->eval(env);
+                return children.back()->eval(env);
             }; break;
             case ASTType::LITERAL: {
                 return literal;
@@ -118,23 +118,45 @@ struct ASTNode {
             case ASTType::VAR: {
                 return env.get_var(symbol);
             }; break;
-            case ASTType::FUN:
+            case ASTType::FUN: {
+                vector<RRObj> args;
+                vector<RRDataType> types;
+                for(int i = 0; i < children.size(); i++) {
+                    args.push_back(children[i]->eval(env));
+                    types.push_back(args[i].type);
+                }
+                RRFun* fun = env.get_fun(symbol, types);
+                return RRObj(fun);
+            }; break;
             case ASTType::OP: {
-                //funny thing is that `=(ten, 10)` is now a legal assignment function call
-                if(symbol == "=") {
-                    // return env.assign_var(children[0]->symbol, children[1]->eval(env));
-                    RRObj& obj = children[0]->eval_mut(env);
-                    obj = children[1]->eval(env);
-                    return obj;
-                } else {
+                if(children.size() == 0) {
+                    //it's a fun-like op call
+                    // `=` is illegal for now
                     vector<RRObj> args;
                     vector<RRDataType> types;
                     for(int i = 0; i < children.size(); i++) {
                         args.push_back(children[i]->eval(env));
                         types.push_back(args[i].type);
                     }
-                    RRFun fun = env.get_fun(symbol, types);
-                    return fun.cpp_fun(args);
+                    RRFun* fun = env.get_fun(symbol, types);
+                    return RRObj(fun);
+                } else {
+                    //it's a regular op
+                    if(symbol == "=") {
+                        // return env.assign_var(children[0]->symbol, children[1]->eval(env));
+                        RRObj& obj = children[0]->eval_mut(env);
+                        obj = children[1]->eval(env);
+                        return obj;
+                    } else {
+                        vector<RRObj> args;
+                        vector<RRDataType> types;
+                        for(int i = 0; i < children.size(); i++) {
+                            args.push_back(children[i]->eval(env));
+                            types.push_back(args[i].type);
+                        }
+                        RRFun* fun = env.get_fun(symbol, types);
+                        return fun->cpp_fun(args);
+                    }
                 }
             }; break;
             case ASTType::IF: {
@@ -145,21 +167,27 @@ struct ASTNode {
                     return children[2]->eval(env);
                 }
             }; break;
-            case ASTType::LOOP: {
-            }; break;
-            case ASTType::FUN_DECL: {
-            }; break;
-            case ASTType::RETURN: {
-            }; break;
             case ASTType::CSV: {
-                rr_runtime_error("Reached a CSV Node");
-            }; break;
-            case ASTType::LIST_BUILDER: {
+                //return a list RRObj
                 RRObj list_obj = RRObj(new vector<RRObj>());
                 for(int i = 0; i < children.size(); i++) {
                     list_obj.data_list->push_back(children[i]->eval(env));
                 }
                 return list_obj;
+            }; break;
+            case ASTType::LIST_BUILDER: {
+                if(children.size() != 1) rr_runtime_error("List Builder doesn't have exactly 1 child");
+                if(children[0]->type != ASTType::CSV) rr_runtime_error("List Builder doesn't have a CSV child");
+                return children[0]->eval(env);
+            }; break;
+            case ASTType::EVALUATE: {
+                //evaluate a function call
+                if(children.size() != 2) rr_runtime_error("Evaluate node doesn't have exactly 2 children");
+                RRObj fn_ptr = children[0]->eval(env);
+                if(!(fn_ptr.type == RRDataType("Fn"))) rr_runtime_error("Trying to evaluate a non-function");
+                //assume that second child is a CSV node
+                RRObj params = children[1]->eval(env);
+                fn_ptr.data_fn->cpp_fun(*params.data_list);
             }; break;
         }
         rr_runtime_error(string("Invalid statement encountered: ")+to_string(type));
