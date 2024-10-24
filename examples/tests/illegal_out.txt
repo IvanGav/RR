@@ -1,2 +1,2 @@
---RR: Error while parsing: Expected operator but found a symbol: round
+--RR: Runtime error: Couldn't find a function 'round<Str,Float>'
 Aborting

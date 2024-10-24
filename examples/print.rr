@@ -1,5 +1,5 @@
 var = "I like "
 c = "cats"
 print(var + c)
-print c
+print(c)
 c

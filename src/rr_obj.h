@@ -11,6 +11,9 @@
 
 using namespace std;
 
+struct RRFun;
+struct RRObj;
+
 struct RRDataType {
     int type;
 
@@ -82,6 +85,10 @@ struct RRObj {
     RRObj(RRFun* rr_fn) {
         type = RRDataType("Fn");
         data_fn = rr_fn;
+    }
+    RRObj(string& literal_str) {
+        type = RRDataType("Str");
+        data_str = new string(literal_str);
     }
     
     friend std::ostream& operator<<(std::ostream& os, const RRObj& obj) {

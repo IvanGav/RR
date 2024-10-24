@@ -22,3 +22,8 @@
 ## logsday 5
 ### aka you can finally have comments
 - comments added
+
+## logsday 6
+### aka i fixed my code. next week i'll need to fix my fixes
+- can index into lists
+- can mutably index into lists

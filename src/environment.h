@@ -69,8 +69,9 @@ struct Env {
         env.funs["concat"].push_back(RRFun({RRDataType("List"), RRDataType("Str")}, concat_list_str));
         //init op_order
         env.op_order["="] = OP_LOW_PRI; //both sides get evaluated first
-        env.op_order["=="] = OP_LOW_PRI+1;
-        env.op_order["repeat"] = OP_LOW_PRI+2;
+        env.op_order["round"] = OP_LOW_PRI+1;
+        env.op_order["=="] = OP_LOW_PRI+2;
+        env.op_order["repeat"] = OP_LOW_PRI+3;
         env.op_order["+"] = OP_HIGH_PRI-5;
         env.op_order["*"] = OP_HIGH_PRI-4;
     }
@@ -93,7 +94,7 @@ struct Env {
         }
         return vars[name];
     }
-    RRFun* get_fun(string& name, vector<RRDataType> arg_types) {
+    RRFun* get_fun(string& name, vector<RRDataType>& arg_types) {
         if(funs.find(name) != funs.end()) {
             for(int i = 0; i < funs[name].size(); i++) {
                 //check if `f.params` vector is equal to `arg_types` vector

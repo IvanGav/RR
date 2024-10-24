@@ -1,0 +1,17 @@
+l = ["Logsday", "lll", 6]
+
+// second item should be "log"
+
+l[1] = "log"
+
+print(concat(l, " ") + "!!")
+
+// also `=(var, 2)` doesn't work anymore :)
+
+// btw, adding indexing into arrays was just a few minutes AFTER i spent a few hours refactoring how i call functions...
+// it's still horrible, i'll need to spend another 5 hours fixing what i did in the past 3 hours
+// oh and mem leaks are real -_-
+
+// but hey i also have automated testing now!
+
+"P.S Cat Loves You"

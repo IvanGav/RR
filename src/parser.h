@@ -35,6 +35,8 @@ enum ASTType {
 };
 
 struct ASTNode;
+ASTNode* apply_evaluate_with_args(ASTNode* root, ASTNode* args);
+ASTNode* apply_index(ASTNode* root, ASTNode* index);
 
 /*
     Structs
@@ -119,27 +121,11 @@ struct ASTNode {
                 return env.get_var(symbol);
             }; break;
             case ASTType::FUN: {
-                vector<RRObj> args;
-                vector<RRDataType> types;
-                for(int i = 0; i < children.size(); i++) {
-                    args.push_back(children[i]->eval(env));
-                    types.push_back(args[i].type);
-                }
-                RRFun* fun = env.get_fun(symbol, types);
-                return RRObj(fun);
+                return RRObj(symbol); //return function name as a literal string object
             }; break;
             case ASTType::OP: {
                 if(children.size() == 0) {
-                    //it's a fun-like op call
-                    // `=` is illegal for now
-                    vector<RRObj> args;
-                    vector<RRDataType> types;
-                    for(int i = 0; i < children.size(); i++) {
-                        args.push_back(children[i]->eval(env));
-                        types.push_back(args[i].type);
-                    }
-                    RRFun* fun = env.get_fun(symbol, types);
-                    return RRObj(fun);
+                    return RRObj(symbol);
                 } else {
                     //it's a regular op
                     if(symbol == "=") {
@@ -183,11 +169,28 @@ struct ASTNode {
             case ASTType::EVALUATE: {
                 //evaluate a function call
                 if(children.size() != 2) rr_runtime_error("Evaluate node doesn't have exactly 2 children");
-                RRObj fn_ptr = children[0]->eval(env);
-                if(!(fn_ptr.type == RRDataType("Fn"))) rr_runtime_error("Trying to evaluate a non-function");
+                RRObj fn_name = children[0]->eval(env); //assume that returned a literal string = name of function
                 //assume that second child is a CSV node
-                RRObj params = children[1]->eval(env);
-                fn_ptr.data_fn->cpp_fun(*params.data_list);
+                RRObj args = children[1]->eval(env);
+                if(!(args.type == RRDataType("List"))) rr_runtime_error("A function is given non argument list");
+                
+                vector<RRDataType> types;
+                for(int i = 0; i < args.data_list->size(); i++) {
+                    types.push_back((*args.data_list)[i].type);
+                }
+                RRFun* fun = env.get_fun(*fn_name.data_str, types);
+                return fun->cpp_fun(*args.data_list);
+            }; break;
+            case ASTType::INDEX: {
+                //evaluate a function call
+                if(children.size() != 2) rr_runtime_error("Evaluate node doesn't have exactly 2 children");
+                RRObj collection = children[0]->eval(env); //assume that returned a literal string = name of function
+                //assume that second child is a CSV node
+                RRObj index = children[1]->eval(env);
+
+                //TODO: i just directly index; call an `index` function instead
+
+                return (*collection.data_list)[index.data_int];
             }; break;
         }
         rr_runtime_error(string("Invalid statement encountered: ")+to_string(type));
@@ -205,6 +208,17 @@ struct ASTNode {
             case ASTType::VAR: {
                 return env.get_var_or_new_mut(symbol); //allow the variables not to be previously created
             }; break;
+            case ASTType::INDEX: {
+                //evaluate a function call
+                if(children.size() != 2) rr_runtime_error("Evaluate node doesn't have exactly 2 children");
+                RRObj collection = children[0]->eval(env); //assume that returned a literal string = name of function
+                //assume that second child is a CSV node
+                RRObj index = children[1]->eval(env);
+
+                //TODO: i just directly index; call an `index` function instead
+
+                return (*collection.data_list)[index.data_int];
+            }; break;
             default: rr_runtime_error("Cannot mutably reference a non-variable");
         }
         rr_runtime_error(string("Invalid statement encountered (mutably): ")+to_string(type));
@@ -214,7 +228,7 @@ struct ASTNode {
     friend std::ostream& operator<<(std::ostream& os, const ASTNode& node) {
         switch(node.type) {
             case ASTType::LITERAL: {
-                os << "ASTNode<Literal>(" << node.literal << ") with " << node.children.size() << " children:" << endl;
+                os << "ASTNode<Literal>(" << node.literal << ") with " << node.children.size() << " children (should be 0):" << endl;
             }; break;
             case ASTType::FUN: {
                 os << "ASTNode<Fun>(" << node.symbol << ") with " << node.children.size() << " children:" << endl;
@@ -230,6 +244,12 @@ struct ASTNode {
             }; break;
             case ASTType::IF: {
                 os << "ASTNode<If> with " << node.children.size() << " children:" << endl;
+            }; break;
+            case ASTType::CSV: {
+                os << "ASTNode<CSV> with " << node.children.size() << " children:" << endl;
+            }; break;
+            case ASTType::EVALUATE: {
+                os << "ASTNode<Evaluate> with " << node.children.size() << " children (should be 2):" << endl;
             }; break;
             default: {
                 os << "ASTNode<NotHandled> with " << node.children.size() << " children:" << endl;
@@ -274,6 +294,10 @@ struct Parser {
                         //assume this call has been for a parentheses expression
                         // a definitive end of statement
                         at_elem++;
+                        if(root->type == ASTType::CSV || root->type == ASTType::STATEMENT) {
+                            //don't wrap wrappers in another one
+                            return root;
+                        }
                         return new ASTNode(ASTType::STATEMENT, {root});
                     } else if(tokens[at_elem].t == "]") {
                         //assume this call has been for a list builder/index
@@ -287,17 +311,21 @@ struct Parser {
                         }
                         root->children.push_back(parse_next_expression(env));
                     } else if(tokens[at_elem].t == "[") {
-                        //TODO: SHOULD BE LEGAL
-                        parse_error("Expected operator but found '[': THIS IS A TEMPORARY ERROR");
+                        //assume index into previous item
+                        at_elem++;
+                        ASTNode* index = parse_line(env);
+                        root = apply_index(root, index);
                     } else if(tokens[at_elem].t == "(") {
                         //assume evaluation of previous item
-                        if(tokens[at_elem+1].t == ")") {
+                        at_elem++;
+                        if(tokens[at_elem].t == ")") {
                             //evaluate with no parameters - `f()`
                             root = apply_evaluate_with_args(root, new ASTNode(ASTType::CSV));
-                            at_elem += 2;
+                            at_elem++;
                         } else {
                             ASTNode* args = parse_line(env);
-                            root = apply_evaluate_with_args(root, new ASTNode(ASTType::CSV));
+                            if(args->type != ASTType::CSV) args = new ASTNode(ASTType::CSV, {args});
+                            root = apply_evaluate_with_args(root, args);
                         }
                     } else if(tokens[at_elem].t == "{") {
                         parse_error("Expected operator but found '{'");
@@ -491,7 +519,7 @@ struct Parser {
 
 //a funny lil function
 ASTNode* apply_evaluate_with_args(ASTNode* root, ASTNode* args) {
-    if(root->type != ASTType::OP) {
+    if(root->type != ASTType::OP || root->children.size() == 0) {
         return new ASTNode(ASTType::EVALUATE, {root, args});
     }
     ASTNode* head = root;
@@ -507,6 +535,9 @@ ASTNode* apply_evaluate_with_args(ASTNode* root, ASTNode* args) {
 ASTNode* apply_index(ASTNode* root, ASTNode* index) {
     if(root->type != ASTType::OP) {
         return new ASTNode(ASTType::INDEX, {root, index});
+    }
+    if(root->children.size() == 0) {
+        parse_error("Trying to index into an operator");
     }
     ASTNode* head = root;
     while(head->children.back()->type == ASTType::OP) {
@@ -743,4 +774,32 @@ n.children[1] will be the operands/index
 - if evaluate, also have only 1 element - it will be a statement
   - statement with 0 children is just a simple f() call
   - statements with more children are: f(param1, param2, param3, ...)
+*/
+
+/*
+
+so there's a problem
+
+i have my evaluate ast node
+
+it has 2 children: function and params
+
+evaluate node needs to be given a function pointer and parameters to the function and then magic can happen
+
+but
+
+what if i can't know what function to retrieve by name and i also need to have number and type of args to the function to retrieve it
+
+moreover i cannot know the type of params before evaluating them
+
+in that case i will need to basically split eval node into 2 cases:
+- function is a named function, which needs to be looked up
+- a statement that returns a function pointer
+
+let's say when fun node is evaluated, it returns a literal object with the function name
+
+would that make sense? no
+
+but i guess it's ok for now... even though it's extremely jank
+
 */
