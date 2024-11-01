@@ -38,6 +38,7 @@ operators `Vec`, `Set`, `List` can be used to convert between the types
 //15 - highest priority
 const int OP_HIGH_PRI = 15;
 const int OP_LOW_PRI = 0;
+const int OP_UNARY_PRI = 16;
 
 /*
     Functions
@@ -54,30 +55,34 @@ struct Env {
 
     static void init_with_default(Env& env) {
         //init funs
-        env.funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_add_int));
-        env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Float")}, float_add_float));
-        env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Int")}, float_add_int));
-        env.funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Float")}, int_add_float));
-        env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, str_add_str));
-        env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_add_int));
-        env.funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_multiply_int));
-        env.funs["=="].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, int_eq_int));
-        env.funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, str_repeat_int));
-        env.funs["round"].push_back(RRFun({RRDataType("Float")}, round_float));
-        env.funs["max"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, max_int_int));
-        env.funs["print"].push_back(RRFun({RRDataType("Any")}, print_any));
-        env.funs["concat"].push_back(RRFun({RRDataType("List"), RRDataType("Str")}, concat_list_str));
+        env.funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, RRDataType("Int"), int_add_int));
+        env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Float")}, RRDataType("Float"), float_add_float));
+        env.funs["+"].push_back(RRFun({RRDataType("Float"), RRDataType("Int")}, RRDataType("Float"), float_add_int));
+        env.funs["+"].push_back(RRFun({RRDataType("Int"), RRDataType("Float")}, RRDataType("Float"), int_add_float));
+        env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Str")}, RRDataType("Str"), str_add_str));
+        env.funs["+"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, RRDataType("Str"), str_add_int));
+        env.funs["*"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, RRDataType("Int"), int_multiply_int));
+        env.funs["=="].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, RRDataType("Bool"), int_eq_int));
+        env.funs["repeat"].push_back(RRFun({RRDataType("Str"), RRDataType("Int")}, RRDataType("Str"), str_repeat_int));
+        env.funs["round"].push_back(RRFun({RRDataType("Float")}, RRDataType("Int"), round_float));
+        env.funs["max"].push_back(RRFun({RRDataType("Int"), RRDataType("Int")}, RRDataType("Int"), max_int_int));
+        env.funs["print"].push_back(RRFun({RRDataType("Any")}, RRDataType("None"), print_any));
+        env.funs["concat"].push_back(RRFun({RRDataType("List"), RRDataType("Str")}, RRDataType("Str"), concat_list_str));
+        //init index funs
+        env.funs["index"].push_back(RRFun({RRDataType("List"), RRDataType("Int")}, RRDataType("Any"), list_int_index));
+        env.funs["index"].push_back(RRFun({RRDataType("List"), RRDataType("List")}, RRDataType("Any"), list_list_index));
         //init op_order
         env.op_order["="] = OP_LOW_PRI; //both sides get evaluated first
-        env.op_order["round"] = OP_LOW_PRI+1;
         env.op_order["=="] = OP_LOW_PRI+2;
         env.op_order["repeat"] = OP_LOW_PRI+3;
         env.op_order["+"] = OP_HIGH_PRI-5;
         env.op_order["*"] = OP_HIGH_PRI-4;
+        //declare unary ops
+        env.op_order["round"] = OP_UNARY_PRI;
     }
 
     RRObj get_var_or_new(string& name) {
-        return vars[name];
+        return vars[name].ref();
     }
     RRObj& get_var_or_new_mut(string& name) {
         return vars[name];
@@ -86,7 +91,7 @@ struct Env {
         if(vars.find(name) == vars.end()) {
             rr_runtime_error("Couldn't find a variable '"s + name + "'");
         }
-        return vars[name];
+        return vars[name].ref();
     }
     RRObj& get_var_mut(string& name) {
         if(vars.find(name) == vars.end()) {
@@ -115,6 +120,7 @@ struct Env {
         exit(1);
     }
     RRObj assign_var(string& name, RRObj obj) {
+        if(!obj.owner) rr_runtime_error("Cannot store a reference to an object: ");
         vars[name] = obj;
         return obj;
     }

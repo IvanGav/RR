@@ -54,6 +54,7 @@ struct ASTNode {
         this->children = {};
     }
     ASTNode(ASTType type, RRObj rr_obj) {
+        if(!rr_obj.owner) parse_error("Trying to insert a reference object into AST literal");
         this->type = type;
         this->children = {};
         this->literal = rr_obj;
@@ -81,6 +82,7 @@ struct ASTNode {
         }
     }
     ASTNode& operator=(const ASTNode& val) {
+        cout << "WARNING: ASSIGNING ASTNode" << endl;
         // Nothing to do in case of self-assignment
         if (&val != this) {
             switch(type) {
@@ -115,10 +117,10 @@ struct ASTNode {
                 return children.back()->eval(env);
             }; break;
             case ASTType::LITERAL: {
-                return literal;
+                return literal.to_owned();
             }; break;
             case ASTType::VAR: {
-                return env.get_var(symbol);
+                return env.get_var(symbol); //will give a ref
             }; break;
             case ASTType::FUN: {
                 return RRObj(symbol); //return function name as a literal string object
@@ -131,8 +133,8 @@ struct ASTNode {
                     if(symbol == "=") {
                         // return env.assign_var(children[0]->symbol, children[1]->eval(env));
                         RRObj& obj = children[0]->eval_mut(env);
-                        obj = children[1]->eval(env);
-                        return obj;
+                        obj = children[1]->eval(env).to_owned();
+                        return obj.ref();
                     } else {
                         vector<RRObj> args;
                         vector<RRDataType> types;
@@ -141,7 +143,7 @@ struct ASTNode {
                             types.push_back(args[i].type);
                         }
                         RRFun* fun = env.get_fun(symbol, types);
-                        return fun->cpp_fun(args);
+                        return fun->cpp_fun(args, env);
                     }
                 }
             }; break;
@@ -159,7 +161,7 @@ struct ASTNode {
                 for(int i = 0; i < children.size(); i++) {
                     list_obj.data_list->push_back(children[i]->eval(env));
                 }
-                return list_obj;
+                return list_obj;//.move();
             }; break;
             case ASTType::LIST_BUILDER: {
                 if(children.size() != 1) rr_runtime_error("List Builder doesn't have exactly 1 child");
@@ -179,7 +181,7 @@ struct ASTNode {
                     types.push_back((*args.data_list)[i].type);
                 }
                 RRFun* fun = env.get_fun(*fn_name.data_str, types);
-                return fun->cpp_fun(*args.data_list);
+                return fun->cpp_fun(*args.data_list, env);
             }; break;
             case ASTType::INDEX: {
                 //evaluate a function call
@@ -190,7 +192,11 @@ struct ASTNode {
 
                 //TODO: i just directly index; call an `index` function instead
 
-                return (*collection.data_list)[index.data_int];
+                string name = "index";
+                vector<RRDataType> dts = {collection.type, index.type};
+                RRFun* fun = env.get_fun(name, dts);
+                vector<RRObj> args = {collection, index};
+                return fun->cpp_fun(args, env);
             }; break;
         }
         rr_runtime_error(string("Invalid statement encountered: ")+to_string(type));
@@ -432,7 +438,7 @@ struct Parser {
             }; break;
             case TokenType::T_LITERAL: {
                 at_elem++;
-                return new ASTNode(ASTType::LITERAL, RRObj(tokens[at_elem-1]) );
+                return new ASTNode( ASTType::LITERAL, RRObj(tokens[at_elem-1]) );
             }; break;
             case TokenType::T_SYMBOL: {
                 //takes care of: unary ops, function-like op calls, functions, variables, if/else
@@ -802,4 +808,113 @@ would that make sense? no
 
 but i guess it's ok for now... even though it's extremely jank
 
+*/
+
+/*
+Let's say there's an array of ints
+I want to have a function that will be like this:
+Vec[1,2,3] + Vec[3,2,1] // -> [4,4,4]
+
+i want to add element by element
+but i also want to be able to add floats, strings, etc element by element
+and i don't want to define a function for every of those additions
+
+so it's probably better to define a function which takes types of two vectors, and adds them element by element
+by retrieving from environment the function + for int/int (since both vecs are int)
+
+that will make it so that even vec<float>+vec<int> and vec<int>+vec<float> will be defined as long as the by-element addition exists
+
+yeah, i'll be passing env& into every cpp function i guess
+*/
+
+/*
+so there is a problem
+let's say i have this:
+l = [1,2,3,4]
+
+this will create a list (heap allocated) and store it to l
+good.
+
+but what about this:
+l = concat([1,2,3,4], " ")
+
+this will create a list, a string, and pass them to the function
+function will return a string, assigned to l
+
+but what about the initial list and string
+they are still heap allocated and exist, even though no longer referenced by the program
+
+mem leak
+
+so i decided to try to make every RRObj either owned or referenced
+
+when owned obj goes out of scope, it will delete the heap allocated memory
+referenced obj don't delete their data when going out of scope
+
+and now my eval function passes around a mix of owned and ref RRObj
+that's hard to deal with
+
+so, what needs to have owned obj and what don't
+
+well... actually the only thing that needs to have an owned object is when you assign something to the variable
+
+there's a little issue with nested objects
+say, this
+l = ["abc","def","ghi"]
+
+this will make a variable that owns a List that owns 3 strings
+
+what happens when you access it?
+concat(l, " ")
+
+you probably get a ref to a list, which holds owned 3 strings
+when it goes out of scope, nothing bad happens
+
+but what if you somehow get an owned list that holds string references?
+actually, nothing bad happens as well, as long as the references are valid
+
+when something bad could happen, is when you do this
+l[1] = "BUT IT WAS ME! DIO!"
+
+you assign a new obj to l[1], which had an owned object
+so i'll need to make sure that whenever assignment happens, i first clone new value (if needed), then delete the old value,
+and only then assign new obj to old obj position
+
+same with this actually
+l = ["newlist"]
+
+i'll need to first delete the old list
+*/
+
+/*
+so when do i *need* to move RRObjects?
+when do i need to invalidate the previous owner?
+or well, transfer the ownership
+
+well... never? i can't think of anything rn
+*/
+
+// when passing by value = copy constructor
+// when returning, it gets returned without any destructors and funny business
+// when passing by value but an rvalue object, do not copy and do not destroy, simply move it - may be different with many args?
+// when vector is overfilled, everything is **copied** and **deleted**
+// when assigned, it's assigned. don't assume any destructors
+// also emplace_back is gud
+
+/*
+copy constructor is used for any vector reallocations/moves
+
+so it probably should be a transfer copy
+except it can't be: it takes a const reference
+except that's not true and i can very much mutate it in a constructor
+but then what if for some reason it gets called a bunch of times on an owner
+the last call will return the only remaining owner, meaning that it'll be hard to predict which one will be the owner
+and maybe lead to the owner to be accidentally left behind
+though i shouldn't ever (manually) need to call copy constructor multiple times
+
+the assignment operator should be unchanged, directly copying all data
+i'll just need to be careful with using it
+for example the destructor will not be initiated if i assign to an owner object
+
+as for .to_owned(), this just returnes a deep cloned copy on the case that the called wasn't an owner
 */

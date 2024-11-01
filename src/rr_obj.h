@@ -4,6 +4,7 @@
 #include <vector>
 #include <unordered_set>
 #include <unordered_map>
+#include <cstring>
 
 #include "datatypes.h"
 #include "tokenizer.h"
@@ -14,38 +15,7 @@ using namespace std;
 struct RRFun;
 struct RRObj;
 
-struct RRDataType {
-    int type;
-
-    RRDataType() {
-        type = -1;
-    }
-    RRDataType(string str) {
-        this->type = single_type_of(str);
-    }
-    RRDataType(Token literal) {
-        switch (literal.info) {
-            case TokenInfo::L_BOOL: type = single_type_of("Bool"); break;
-            case TokenInfo::L_FLOAT: type = single_type_of("Float"); break;
-            case TokenInfo::L_INT: type = single_type_of("Int"); break;
-            case TokenInfo::L_STR: type = single_type_of("Str"); break;
-            default: parse_error("Creating a DataType out of a non-literal token");
-        }
-    }
-
-    friend bool operator==(const RRDataType& lhs, const RRDataType& rhs) {
-        return lhs.equivalent_to(rhs);
-    }
-    //return true if this object is *equivalent* to rhs
-    //rhs may include datatype `Any`
-    bool equivalent_to(const RRDataType& rhs) const {
-        return (type == rhs.type) || rhs.type == DATATYPE_ANY;
-    }
-};
-
-//takes ownership of the data
-// TODO: add desctuctor
-// TODO: ensure no duplicate pointers to same data (with long life times)
+//takes ownership of the data whenever `owner = true`
 struct RRObj {
     RRDataType type;
     union {
@@ -59,14 +29,29 @@ struct RRObj {
         unordered_map<RRObj, RRObj>* data_map;
         pair<RRObj, RRObj>* data_pair;
     };
+    bool owner;
 
     RRObj() {
         type = RRDataType();
         data_int = 0;
+        owner = true;
+    }
+    //deep clone constructor
+    RRObj(const RRObj& from) {
+        type = from.type;
+        if(type == RRDataType("Str")) {
+            data_str = new string(*from.data_str);
+        } else if(type == RRDataType("List")) {
+            data_list = new vector<RRObj>(*from.data_list);
+        } else {
+            memcpy(this, &from, sizeof(RRObj));
+        }
+        owner = true;
     }
     RRObj(RRDataType t) {
         type = t;
         data_int = 0;
+        owner = true;
     }
     RRObj(Token t) {
         this->type = RRDataType(t);
@@ -77,18 +62,76 @@ struct RRObj {
             case TokenInfo::L_FLOAT: this->data_float = (stod(t.t)); break;
             default: break;
         }
+        owner = true;
     }
     RRObj(vector<RRObj>* list) {
         type = RRDataType("List");
         data_list = list;
-    }
-    RRObj(RRFun* rr_fn) {
-        type = RRDataType("Fn");
-        data_fn = rr_fn;
+        owner = true;
     }
     RRObj(string& literal_str) {
         type = RRDataType("Str");
         data_str = new string(literal_str);
+        owner = true;
+    }
+    RRObj(RRFun* rr_fn) {
+        type = RRDataType("Fn");
+        data_fn = rr_fn;
+        owner = true; //can't take ownership of functions, so doesn't matter
+    }
+
+    ~RRObj() {
+        if(owner) {
+            if(type == RRDataType("Str")) {
+                delete data_str;
+            } else if(type == RRDataType("List")) {
+                delete data_list;
+            }
+        }
+    }
+
+    // RRObj& operator=(const RRObj& other) {
+    //     // Check for self-assignment
+    //     if (this == &other) {
+    //         return *this;
+    //     }
+    //     memcpy(this, &other, sizeof(RRObj));
+    //     this->owner = false;
+    //     return *this;
+    // }
+
+    //make a reference to `this` - reference will not release the resources
+    RRObj ref() {
+        RRObj reference = *this;
+        reference.owner = false;
+        return reference;
+    }
+    //move ownership of data from `this` to returned obj; make `this` a reference instead
+    RRObj move() {
+        if(!owner) rr_runtime_error("Trying to move a reference to an object");
+        RRObj new_owner = *this;
+        this->owner = false;
+        new_owner.owner = true; //guaranteed
+        return new_owner;
+    }
+    //move if owned; take reference when not owned
+    RRObj transfer() {
+        RRObj new_owner = *this;
+        new_owner.owner = this->owner;
+        owner = false;
+        return new_owner;
+    }
+    //if owner, do nothing; if not owner, deep clone in place
+    void to_owned() {
+        if(!owner) {
+            //not owned, do deep clone
+            if(type == RRDataType("Str")) {
+                data_str = new string(*this->data_str);
+            } else if(type == RRDataType("List")) {
+                data_list = new vector<RRObj>(*this->data_list);
+            }
+            owner = true;
+        }
     }
     
     friend std::ostream& operator<<(std::ostream& os, const RRObj& obj) {
@@ -134,6 +177,9 @@ struct RRObj {
                 }
                 return os << "]";
             };
+            case 10: {
+                return os << "None";
+            };
             default: return os << "Unhandled type";
         }
     }
@@ -141,12 +187,14 @@ struct RRObj {
 
 struct RRFun {
     vector<RRDataType> params;
-    RRObj (*cpp_fun)(vector<RRObj>);
+    RRDataType return_type;
+    RRObj (*cpp_fun)(vector<RRObj>&, Env&);
     void* rr_fun;
 
     RRFun() {}
-    RRFun(vector<RRDataType> params, RRObj (*cpp_fun)(vector<RRObj>)) {
+    RRFun(vector<RRDataType> params, RRDataType return_type, RRObj (*cpp_fun)(vector<RRObj>&, Env&)) {
         this->params = params;
+        this->return_type = return_type;
         this->cpp_fun = cpp_fun;
     }
 };
